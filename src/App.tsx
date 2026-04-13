@@ -24,7 +24,9 @@ import {
   ShieldCheck,
   Zap,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Mail,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PDFDocument, degrees } from 'pdf-lib';
@@ -53,6 +55,9 @@ import {
   signInWithPopup, 
   signOut, 
   onAuthStateChanged, 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
   doc, 
   setDoc, 
   getDoc,
@@ -68,58 +73,7 @@ import { getDocFromServer } from 'firebase/firestore';
 
 // Error Boundary Component (Removed due to lint issues)
 
-interface ErrorBoundaryProps {
-  children: React.ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-}
-
-class ErrorBoundary extends (React.Component as any) {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
-          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
-            <RotateCw className="w-10 h-10" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">Something went wrong</h2>
-          <p className="text-slate-500 mb-8 max-w-md mx-auto">We encountered an unexpected error while rendering this section. Please try reloading the page or go back to the home screen.</p>
-          <div className="flex gap-4 justify-center">
-            <button 
-              onClick={() => window.location.reload()}
-              className="bg-red-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95"
-            >
-              Reload Page
-            </button>
-            <button 
-              onClick={() => { this.setState({ hasError: false }); window.location.href = '/'; }}
-              className="bg-slate-100 text-slate-700 px-8 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95"
-            >
-              Go Home
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
+// Error Boundary Component (Removed due to lint issues)
 
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<ToolCategory>('All');
@@ -138,6 +92,8 @@ export default function App() {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [userHistory, setUserHistory] = useState<any[]>([]);
   const [adminData, setAdminData] = useState<{ users: any[], history: any[], messages: any[] }>({ users: [], history: [], messages: [] });
   const [isAdminLoading, setIsAdminLoading] = useState(false);
@@ -203,6 +159,17 @@ export default function App() {
       'privacy_first': 'Privacy First',
       'our_mission': 'Our Mission',
       'my_history': 'My History',
+      'signup': 'Sign Up',
+      'login_title': 'Welcome Back',
+      'login_subtitle': 'Log in to your account to access your PDF history.',
+      'signup_title': 'Create an Account',
+      'signup_subtitle': 'Join RohitPDFHub to track your history and manage PDFs better.',
+      'email_signup': 'Sign up with Email',
+      'google_auth': 'Continue with Google',
+      'full_name': 'Full Name',
+      'password': 'Password',
+      'already_have_account': 'Already have an account?',
+      'dont_have_account': 'Don\'t have an account?',
       'no_history': 'No history found. Start using tools to see your activity!',
       'tool_name': 'Tool',
       'file_name': 'File Name',
@@ -281,6 +248,17 @@ export default function App() {
       'privacy_first': 'गोपनीयता पहले',
       'our_mission': 'हमारा मिशन',
       'my_history': 'मेरा इतिहास',
+      'signup': 'साइन अप करें',
+      'login_title': 'वापसी पर स्वागत है',
+      'login_subtitle': 'अपने PDF इतिहास तक पहुँचने के लिए अपने खाते में लॉग इन करें।',
+      'signup_title': 'खाता बनाएं',
+      'signup_subtitle': 'अपने इतिहास को ट्रैक करने और PDF को बेहतर ढंग से मैनेज करने के लिए RohitPDFHub से जुड़ें।',
+      'email_signup': 'ईमेल के साथ साइन अप करें',
+      'google_auth': 'Google के साथ जारी रखें',
+      'full_name': 'पूरा नाम',
+      'password': 'पासवर्ड',
+      'already_have_account': 'पहले से ही एक खाता है?',
+      'dont_have_account': 'खाता नहीं है?',
       'no_history': 'कोई इतिहास नहीं मिला। अपनी गतिविधि देखने के लिए टूल्स का उपयोग शुरू करें!',
       'tool_name': 'टूल',
       'file_name': 'फ़ाइल का नाम',
@@ -336,6 +314,19 @@ export default function App() {
       'tool_pdf-to-ppt_title': 'PDF a PPT',
       'tool_pdf-to-ppt_desc': 'Convierte PDF a PowerPoint.',
       'my_history': 'Mi historial',
+      'signup': 'Registrarse',
+      'signup_title': 'Crear una cuenta',
+      'signup_subtitle': 'Únete a RohitPDFHub para seguir tu historial y gestionar PDFs mejor.',
+      'email_signup': 'Registrarse con Email',
+      'phone_signup': 'Registrarse con Teléfono',
+      'full_name': 'Nombre completo',
+      'password': 'Contraseña',
+      'phone_number': 'Número de teléfono',
+      'send_otp': 'Enviar OTP',
+      'verify_otp': 'Verificar OTP',
+      'enter_otp': 'Ingresar OTP',
+      'already_have_account': '¿Ya tienes una cuenta?',
+      'dont_have_account': '¿No tienes una cuenta?',
       'no_history': 'No se encontró historial.',
       'target_size': 'Tamaño de archivo objetivo (MB)',
       'mb': 'MB'
@@ -397,6 +388,85 @@ export default function App() {
     };
   };
 
+  const [signUpData, setSignUpData] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+  });
+
+  const [loginData, setLoginData] = useState({
+    email: '',
+    password: '',
+  });
+
+  const handleAuthError = (error: any) => {
+    console.error('Auth error:', error);
+    let message = error.message;
+    
+    if (error.code === 'auth/popup-closed-by-user') {
+      message = 'Login cancelled. Please try again.';
+    } else if (error.code === 'auth/operation-not-allowed') {
+      message = 'This sign-in method is not enabled. Please enable Email/Password in your Firebase Console.';
+    } else if (error.code === 'auth/email-already-in-use') {
+      message = 'This email is already registered. Please login instead.';
+    } else if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      message = 'Invalid email or password.';
+    }
+    
+    setNotification({ message, type: 'error' });
+  };
+
+  const handleEmailSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signUpData.email || !signUpData.password || !signUpData.fullName) {
+      setNotification({ message: 'Please fill all fields', type: 'error' });
+      return;
+    }
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, signUpData.email, signUpData.password);
+      await updateProfile(userCredential.user, { displayName: signUpData.fullName });
+      
+      // Create user document
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: signUpData.fullName,
+        role: 'user',
+        createdAt: serverTimestamp()
+      });
+
+      setNotification({ message: 'Account created successfully!', type: 'success' });
+      setShowSignUpModal(false);
+    } catch (error: any) {
+      handleAuthError(error);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginData.email || !loginData.password) {
+      setNotification({ message: 'Please fill all fields', type: 'error' });
+      return;
+    }
+    try {
+      await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
+      setNotification({ message: 'Logged in successfully!', type: 'success' });
+      setShowLoginModal(false);
+    } catch (error: any) {
+      handleAuthError(error);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      setShowLoginModal(false);
+      setShowSignUpModal(false);
+    } catch (error: any) {
+      handleAuthError(error);
+    }
+  };
+
   const isAdmin = user?.email === 'rohit.jnbh8@gmail.com';
 
   const languages = [
@@ -448,14 +518,6 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
-
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error('Login failed:', error);
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -1213,12 +1275,20 @@ export default function App() {
                 </AnimatePresence>
               </div>
             ) : (
-              <button 
-                onClick={handleLogin}
-                className="bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-red-700 transition-all shadow-md active:scale-95"
-              >
-                {t('login')}
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setShowLoginModal(true)}
+                  className="bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-red-700 transition-all shadow-md active:scale-95"
+                >
+                  {t('login')}
+                </button>
+                <button 
+                  onClick={() => setShowSignUpModal(true)}
+                  className="bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-red-700 transition-all shadow-md active:scale-95"
+                >
+                  {t('signup')}
+                </button>
+              </div>
             )}
           </div>
 
@@ -1327,8 +1397,7 @@ export default function App() {
       </AnimatePresence>
 
       <main className="max-w-7xl mx-auto px-4 py-12">
-        <ErrorBoundary>
-          <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait">
           {showAdminDashboard ? (
             <motion.div
               key="admin"
@@ -1791,7 +1860,6 @@ export default function App() {
             </motion.div>
           )}
           </AnimatePresence>
-        </ErrorBoundary>
       </main>
 
       {/* Modals */}
@@ -2106,6 +2174,212 @@ export default function App() {
                 >
                   Close
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {showLoginModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLoginModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="bg-red-600 p-8 text-white">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <UserIcon className="w-8 h-8" />
+                    <h2 className="text-3xl font-bold">{t('login')}</h2>
+                  </div>
+                  <button onClick={() => setShowLoginModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                <p className="text-red-100 mt-2 text-sm">{t('login_subtitle')}</p>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <form onSubmit={handleEmailLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('email_label')}</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="email" 
+                        placeholder="john@example.com"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={loginData.email}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('password')}</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="password" 
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={loginData.password}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95 mt-4"
+                  >
+                    {t('login')}
+                  </button>
+                </form>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-100"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-slate-400">Or continue with</span>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleGoogleLogin}
+                  className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95"
+                >
+                  <Globe className="w-5 h-5 text-blue-500" />
+                  {t('google_auth')}
+                </button>
+
+                <div className="pt-6 border-t border-slate-100 text-center">
+                  <p className="text-sm text-slate-500">
+                    {t('dont_have_account')}{' '}
+                    <button 
+                      onClick={() => { setShowLoginModal(false); setShowSignUpModal(true); }}
+                      className="text-red-600 font-bold hover:underline"
+                    >
+                      {t('signup')}
+                    </button>
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showSignUpModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSignUpModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="bg-red-600 p-8 text-white">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <UserIcon className="w-8 h-8" />
+                    <h2 className="text-3xl font-bold">{t('signup')}</h2>
+                  </div>
+                  <button onClick={() => setShowSignUpModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                <p className="text-red-100 mt-2 text-sm">{t('signup_subtitle')}</p>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <form onSubmit={handleEmailSignUp} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('full_name')}</label>
+                    <div className="relative">
+                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="John Doe"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={signUpData.fullName}
+                        onChange={(e) => setSignUpData(prev => ({ ...prev, fullName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('email_label')}</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="email" 
+                        placeholder="john@example.com"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={signUpData.email}
+                        onChange={(e) => setSignUpData(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('password')}</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="password" 
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={signUpData.password}
+                        onChange={(e) => setSignUpData(prev => ({ ...prev, password: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95 mt-4"
+                  >
+                    {t('signup')}
+                  </button>
+                </form>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-100"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-slate-400">Or continue with</span>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleGoogleLogin}
+                  className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95"
+                >
+                  <Globe className="w-5 h-5 text-blue-500" />
+                  {t('google_auth')}
+                </button>
+
+                <div className="pt-6 border-t border-slate-100 text-center">
+                  <p className="text-sm text-slate-500">
+                    {t('already_have_account')}{' '}
+                    <button 
+                      onClick={() => { setShowSignUpModal(false); setShowLoginModal(true); }}
+                      className="text-red-600 font-bold hover:underline"
+                    >
+                      {t('login')}
+                    </button>
+                  </p>
+                </div>
               </div>
             </motion.div>
           </div>
