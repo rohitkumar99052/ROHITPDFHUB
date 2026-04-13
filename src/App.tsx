@@ -179,6 +179,8 @@ export default function App() {
       'tool_split_desc': 'Extract pages from your PDF or save each page as a separate PDF.',
       'tool_compress_title': 'Compress PDF',
       'tool_compress_desc': 'Reduce the size of your PDF while maintaining quality.',
+      'tool_compress-jpg_title': 'Compress JPG',
+      'tool_compress-jpg_desc': 'Reduce JPG image size while maintaining quality. Set your target size in MB or KB.',
       'tool_word-to-pdf_title': 'Word to PDF',
       'tool_word-to-pdf_desc': 'Convert Word documents to PDF with high accuracy.',
       'tool_pdf-to-word_title': 'PDF to Word',
@@ -212,9 +214,10 @@ export default function App() {
       'tool_name': 'Tool',
       'file_name': 'File Name',
       'date': 'Date',
-      'target_size': 'Target File Size (MB)',
+      'target_size': 'Target File Size',
       'target_size_desc': 'Set desired size for the output file (optional)',
       'mb': 'MB',
+      'kb': 'KB',
       'profile_settings': 'Profile Settings',
       'update_profile': 'Update Profile',
       'change_password': 'Change Password',
@@ -265,6 +268,8 @@ export default function App() {
       'tool_split_desc': 'अपने PDF से पेज निकालें या प्रत्येक पेज को अलग PDF के रूप में सहेजें।',
       'tool_compress_title': 'कंप्रेस PDF',
       'tool_compress_desc': 'गुणवत्ता बनाए रखते हुए अपने PDF का आकार कम करें।',
+      'tool_compress-jpg_title': 'कंप्रेस JPG',
+      'tool_compress-jpg_desc': 'गुणवत्ता बनाए रखते हुए अपनी JPG इमेज का आकार कम करें। अपना लक्ष्य आकार MB या KB में सेट करें।',
       'tool_word-to-pdf_title': 'Word से PDF',
       'tool_word-to-pdf_desc': 'उच्च सटीकता के साथ Word दस्तावेज़ों को PDF में बदलें।',
       'tool_pdf-to-word_title': 'PDF से Word',
@@ -310,9 +315,10 @@ export default function App() {
       'tool_name': 'टूल',
       'file_name': 'फ़ाइल का नाम',
       'date': 'तारीख',
-      'target_size': 'लक्ष्य फ़ाइल का आकार (MB)',
+      'target_size': 'लक्ष्य फ़ाइल का आकार',
       'target_size_desc': 'आउटपुट फ़ाइल के लिए वांछित आकार सेट करें (वैकल्पिक)',
       'mb': 'MB',
+      'kb': 'KB',
       'profile_settings': 'प्रोफ़ाइल सेटिंग्स',
       'update_profile': 'प्रोफ़ाइल अपडेट करें',
       'change_password': 'पासवर्ड बदलें',
@@ -721,7 +727,7 @@ export default function App() {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const [toolOptions, setToolOptions] = useState<{ password?: string, watermark?: string, pageStart?: number, targetSize?: string }>({});
+  const [toolOptions, setToolOptions] = useState<{ password?: string, watermark?: string, pageStart?: number, targetSize?: string, sizeUnit?: 'MB' | 'KB' }>({ sizeUnit: 'MB' });
 
   const processPDF = async () => {
     if (files.length === 0 || !selectedTool) return;
@@ -1141,6 +1147,35 @@ export default function App() {
           break;
         }
 
+        case 'compress-jpg': {
+          const img = new Image();
+          const reader = new FileReader();
+          const dataUrl = await new Promise<string>((resolve) => {
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.readAsDataURL(firstFile);
+          });
+          
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.src = dataUrl;
+          });
+
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx?.drawImage(img, 0, 0);
+
+          // Initial high quality
+          const blob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9);
+          });
+
+          resultBlob = blob;
+          resultFileName = `compressed_${firstFile.name}`;
+          break;
+        }
+
         default: {
           // Smart Simulation for all other tools
           await new Promise(resolve => setTimeout(resolve, 3000));
@@ -1165,23 +1200,64 @@ export default function App() {
       if (resultBlob && resultFileName) {
         // Handle Target Size if specified
         if (toolOptions.targetSize) {
-          const targetMB = parseFloat(toolOptions.targetSize);
-          const currentMB = resultBlob.size / (1024 * 1024);
+          const size = parseFloat(toolOptions.targetSize);
+          const unit = toolOptions.sizeUnit || 'MB';
+          const targetBytes = unit === 'MB' ? size * 1024 * 1024 : size * 1024;
+          const currentBytes = resultBlob.size;
           
-          if (currentMB > targetMB) {
+          if (currentBytes > targetBytes) {
             try {
-              const arrayBuffer = await resultBlob.arrayBuffer();
-              const pdfDoc = await PDFDocument.load(arrayBuffer);
-              // useObjectStreams: true helps reduce size by compressing objects
-              const optimizedBytes = await pdfDoc.save({ useObjectStreams: true });
-              resultBlob = new Blob([optimizedBytes], { type: 'application/pdf' });
+              if (selectedTool.id === 'compress-jpg') {
+                const img = new Image();
+                const reader = new FileReader();
+                const dataUrl = await new Promise<string>((resolve) => {
+                  reader.onload = (e) => resolve(e.target?.result as string);
+                  reader.readAsDataURL(resultBlob!);
+                });
+                
+                await new Promise((resolve) => {
+                  img.onload = resolve;
+                  img.src = dataUrl;
+                });
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx?.drawImage(img, 0, 0);
+
+                // Iteratively reduce quality to meet target size
+                let quality = 0.8;
+                let optimizedBlob = resultBlob!;
+                
+                while (quality > 0.1) {
+                  const tempBlob = await new Promise<Blob>((resolve) => {
+                    canvas.toBlob((b) => resolve(b!), 'image/jpeg', quality);
+                  });
+                  
+                  if (tempBlob.size <= targetBytes) {
+                    optimizedBlob = tempBlob;
+                    break;
+                  }
+                  optimizedBlob = tempBlob; // Keep the last one even if it's over
+                  quality -= 0.1;
+                }
+                resultBlob = optimizedBlob;
+              } else {
+                const arrayBuffer = await resultBlob.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+                // useObjectStreams: true helps reduce size by compressing objects
+                const optimizedBytes = await pdfDoc.save({ useObjectStreams: true });
+                resultBlob = new Blob([optimizedBytes], { type: 'application/pdf' });
+              }
               
-              const newMB = resultBlob.size / (1024 * 1024);
-              console.log(`Optimized from ${currentMB.toFixed(2)}MB to ${newMB.toFixed(2)}MB (Target: ${targetMB}MB)`);
+              const newSize = resultBlob.size / (unit === 'MB' ? 1024 * 1024 : 1024);
+              const currentSize = currentBytes / (unit === 'MB' ? 1024 * 1024 : 1024);
+              console.log(`Optimized from ${currentSize.toFixed(2)}${unit} to ${newSize.toFixed(2)}${unit} (Target: ${size}${unit})`);
               
-              if (newMB > targetMB) {
+              if (resultBlob.size > targetBytes) {
                 setNotification({
-                  message: `Note: We optimized the file as much as possible, but it is still ${newMB.toFixed(2)}MB, which is above your target of ${targetMB}MB.`,
+                  message: `Note: We optimized the file as much as possible, but it is still ${newSize.toFixed(2)}${unit}, which is above your target of ${size}${unit}.`,
                   type: 'info'
                 });
               }
@@ -1201,6 +1277,8 @@ export default function App() {
             toolId: selectedTool.id,
             toolName: selectedTool.title,
             fileName: files[0].name,
+            targetSize: toolOptions.targetSize || null,
+            sizeUnit: toolOptions.sizeUnit || 'MB',
             timestamp: serverTimestamp()
           });
         } catch (historyError) {
@@ -1821,7 +1899,7 @@ export default function App() {
                     >
                       {tool.featured && (
                         <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wider animate-pulse">
-                          Featured
+                          {tool.id === 'compress-jpg' ? 'New' : 'Featured'}
                         </div>
                       )}
                       <div className={cn(
@@ -1952,17 +2030,24 @@ export default function App() {
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                               {t('target_size')} <span className="text-red-500">*</span>
                             </label>
-                            <div className="relative">
-                              <input 
-                                type="number" 
-                                placeholder="e.g. 2" 
-                                className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none pr-12"
-                                value={toolOptions.targetSize || ''}
-                                onChange={(e) => setToolOptions(prev => ({ ...prev, targetSize: e.target.value }))}
-                              />
-                              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
-                                MB
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <input 
+                                  type="number" 
+                                  placeholder="e.g. 2" 
+                                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none"
+                                  value={toolOptions.targetSize || ''}
+                                  onChange={(e) => setToolOptions(prev => ({ ...prev, targetSize: e.target.value }))}
+                                />
                               </div>
+                              <select 
+                                className="px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none bg-white font-bold text-xs text-slate-600"
+                                value={toolOptions.sizeUnit || 'MB'}
+                                onChange={(e) => setToolOptions(prev => ({ ...prev, sizeUnit: e.target.value as 'MB' | 'KB' }))}
+                              >
+                                <option value="MB">{t('mb')}</option>
+                                <option value="KB">{t('kb')}</option>
+                              </select>
                             </div>
                             <p className="text-[10px] text-slate-400 mt-1 italic">{t('target_size_desc')}</p>
                           </div>
@@ -2012,6 +2097,7 @@ export default function App() {
                               <>
                                 {selectedTool.id === 'merge' ? 'Merge PDF' : 
                                  selectedTool.id === 'rotate-pdf' ? 'Rotate PDF' : 
+                                 selectedTool.id === 'compress-jpg' ? 'Compress JPG' : 
                                  'Process PDF'}
                                 <Download className="w-6 h-6" />
                               </>

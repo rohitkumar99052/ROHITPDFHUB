@@ -58,6 +58,16 @@ export const TOOLS: PDFTool[] = [
     featured: true
   },
   {
+    id: 'compress-jpg',
+    title: 'Compress JPG',
+    description: 'Reduce JPG image size while maintaining quality. Set your target size in MB or KB.',
+    icon: ImageIcon,
+    category: ['All', 'Optimize PDF'],
+    color: 'bg-orange-500',
+    action: 'compress',
+    featured: true
+  },
+  {
     id: 'merge',
     title: 'Merge PDF',
     description: 'Combine PDFs in the order you want with the easiest PDF merger available.',
