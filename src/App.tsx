@@ -54,8 +54,11 @@ import {
   doc, 
   setDoc, 
   getDoc,
+  getDocs,
   addDoc,
   collection,
+  query,
+  orderBy,
   serverTimestamp,
   User
 } from './firebase';
@@ -79,6 +82,8 @@ export default function App() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [userHistory, setUserHistory] = useState<any[]>([]);
   const [adminData, setAdminData] = useState<{ users: any[], history: any[], messages: any[] }>({ users: [], history: [], messages: [] });
   const [isAdminLoading, setIsAdminLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<'users' | 'messages'>('users');
@@ -141,7 +146,12 @@ export default function App() {
       'close': 'Close',
       'faq_title': 'Frequently Asked Questions',
       'privacy_first': 'Privacy First',
-      'our_mission': 'Our Mission'
+      'our_mission': 'Our Mission',
+      'my_history': 'My History',
+      'no_history': 'No history found. Start using tools to see your activity!',
+      'tool_name': 'Tool',
+      'file_name': 'File Name',
+      'date': 'Date'
     },
     'Hindi': {
       'home': 'होम',
@@ -199,7 +209,12 @@ export default function App() {
       'close': 'बंद करें',
       'faq_title': 'अक्सर पूछे जाने वाले प्रश्न',
       'privacy_first': 'गोपनीयता पहले',
-      'our_mission': 'हमारा मिशन'
+      'our_mission': 'हमारा मिशन',
+      'my_history': 'मेरा इतिहास',
+      'no_history': 'कोई इतिहास नहीं मिला। अपनी गतिविधि देखने के लिए टूल्स का उपयोग शुरू करें!',
+      'tool_name': 'टूल',
+      'file_name': 'फ़ाइल का नाम',
+      'date': 'तारीख'
     },
     'Spanish': {
       'home': 'Inicio',
@@ -227,6 +242,28 @@ export default function App() {
       'back_btn': 'Volver a herramientas'
     }
   };
+
+  const fetchHistory = useCallback(async () => {
+    if (!user) return;
+    try {
+      const historyRef = collection(db, 'users', user.uid, 'history');
+      const q = query(historyRef, orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const historyData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUserHistory(historyData);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (showHistoryModal) {
+      fetchHistory();
+    }
+  }, [showHistoryModal, fetchHistory]);
 
   const t = (key: string) => {
     return translations[currentLanguage]?.[key] || translations['English'][key] || key;
@@ -943,8 +980,11 @@ export default function App() {
                             <ShieldCheck className="w-4 h-4" /> Admin Dashboard
                           </button>
                         )}
-                        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors">
-                          <History className="w-4 h-4" /> My History
+                        <button 
+                          onClick={() => { setShowHistoryModal(true); setShowUserMenu(false); }}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
+                        >
+                          <History className="w-4 h-4" /> {t('my_history')}
                         </button>
                         <button 
                           onClick={() => { setShowAboutModal(true); setShowUserMenu(false); }}
@@ -1318,8 +1358,29 @@ export default function App() {
                       layoutId={tool.id}
                       onClick={() => setSelectedTool(tool)}
                       whileHover={{ y: -5 }}
-                      className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+                      animate={tool.featured ? {
+                        borderColor: ["#f1f5f9", "#ef4444", "#f1f5f9"],
+                        boxShadow: [
+                          "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+                          "0 0 15px rgba(239, 68, 68, 0.2)",
+                          "0 1px 2px 0 rgb(0 0 0 / 0.05)"
+                        ]
+                      } : {}}
+                      transition={tool.featured ? {
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      } : {}}
+                      className={cn(
+                        "bg-white p-6 rounded-2xl shadow-sm border cursor-pointer hover:shadow-xl transition-all duration-300 group relative overflow-hidden",
+                        tool.featured ? "border-red-100" : "border-slate-100"
+                      )}
                     >
+                      {tool.featured && (
+                        <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wider animate-pulse">
+                          Featured
+                        </div>
+                      )}
                       <div className={cn(
                         "w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4 transition-transform group-hover:scale-110",
                         tool.color
@@ -1332,7 +1393,7 @@ export default function App() {
                       <p className="text-slate-500 text-sm leading-relaxed">
                         {tTool.description}
                       </p>
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Plus className="w-4 h-4 text-slate-300" />
                       </div>
                     </motion.div>
@@ -1640,6 +1701,73 @@ export default function App() {
                     {t('close')}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showHistoryModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowHistoryModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="bg-slate-800 p-8 text-white">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <History className="w-8 h-8" />
+                    <h2 className="text-3xl font-bold">{t('my_history')}</h2>
+                  </div>
+                  <button onClick={() => setShowHistoryModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-8 max-h-[60vh] overflow-y-auto">
+                {userHistory.length > 0 ? (
+                  <div className="space-y-4">
+                    {userHistory.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
+                            <File className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800">{item.toolName}</p>
+                            <p className="text-xs text-slate-500 truncate max-w-[200px]">{item.fileName}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-medium text-slate-400">
+                            {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleString() : 'Just now'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <History className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                    <p className="text-slate-500">{t('no_history')}</p>
+                  </div>
+                )}
+              </div>
+              <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button 
+                  onClick={() => setShowHistoryModal(false)}
+                  className="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-900 transition-all active:scale-95"
+                >
+                  {t('close')}
+                </button>
               </div>
             </motion.div>
           </div>

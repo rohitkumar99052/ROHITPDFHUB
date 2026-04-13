@@ -28,13 +28,44 @@ import { PDFTool, ToolCategory } from './types';
 
 export const TOOLS: PDFTool[] = [
   {
+    id: 'jpg-to-pdf',
+    title: 'JPG to PDF',
+    description: 'Convert JPG images to PDF in seconds. Easily adjust orientation and margins.',
+    icon: ImageIcon,
+    category: ['All', 'Convert PDF'],
+    color: 'bg-yellow-600',
+    action: 'convert',
+    featured: true
+  },
+  {
+    id: 'pdf-to-jpg',
+    title: 'PDF to JPG',
+    description: 'Convert each PDF page into a JPG or extract all images contained in a PDF.',
+    icon: ImageIcon,
+    category: ['All', 'Convert PDF'],
+    color: 'bg-yellow-500',
+    action: 'convert',
+    featured: true
+  },
+  {
+    id: 'compress',
+    title: 'Compress PDF',
+    description: 'Reduce file size while optimizing for maximal PDF quality.',
+    icon: Zap,
+    category: ['All', 'Optimize PDF'],
+    color: 'bg-blue-500',
+    action: 'compress',
+    featured: true
+  },
+  {
     id: 'merge',
     title: 'Merge PDF',
     description: 'Combine PDFs in the order you want with the easiest PDF merger available.',
     icon: Merge,
     category: ['All', 'Organize PDF'],
     color: 'bg-orange-500',
-    action: 'merge'
+    action: 'merge',
+    featured: true
   },
   {
     id: 'split',
@@ -44,15 +75,6 @@ export const TOOLS: PDFTool[] = [
     category: ['All', 'Organize PDF'],
     color: 'bg-red-500',
     action: 'split'
-  },
-  {
-    id: 'compress',
-    title: 'Compress PDF',
-    description: 'Reduce file size while optimizing for maximal PDF quality.',
-    icon: Zap,
-    category: ['All', 'Optimize PDF'],
-    color: 'bg-blue-500',
-    action: 'compress'
   },
   {
     id: 'pdf-to-word',
@@ -116,24 +138,6 @@ export const TOOLS: PDFTool[] = [
     category: ['All', 'Edit PDF'],
     color: 'bg-purple-500',
     action: 'edit'
-  },
-  {
-    id: 'pdf-to-jpg',
-    title: 'PDF to JPG',
-    description: 'Convert each PDF page into a JPG or extract all images contained in a PDF.',
-    icon: ImageIcon,
-    category: ['All', 'Convert PDF'],
-    color: 'bg-yellow-500',
-    action: 'convert'
-  },
-  {
-    id: 'jpg-to-pdf',
-    title: 'JPG to PDF',
-    description: 'Convert JPG images to PDF in seconds. Easily adjust orientation and margins.',
-    icon: ImageIcon,
-    category: ['All', 'Convert PDF'],
-    color: 'bg-yellow-600',
-    action: 'convert'
   },
   {
     id: 'sign-pdf',

@@ -18,4 +18,5 @@ export interface PDFTool {
   category: ToolCategory[];
   color: string;
   action: string;
+  featured?: boolean;
 }
