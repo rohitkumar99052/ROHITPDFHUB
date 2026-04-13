@@ -58,6 +58,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
+  updateEmail,
+  updatePassword,
+  sendPasswordResetEmail,
   doc, 
   setDoc, 
   getDoc,
@@ -66,7 +69,11 @@ import {
   collection,
   query,
   orderBy,
+  limit,
+  onSnapshot,
   serverTimestamp,
+  updateDoc,
+  where,
   User
 } from './firebase';
 import { getDocFromServer } from 'firebase/firestore';
@@ -74,6 +81,12 @@ import { getDocFromServer } from 'firebase/firestore';
 // Error Boundary Component (Removed due to lint issues)
 
 // Error Boundary Component (Removed due to lint issues)
+
+const AVATARS = [
+  '👨', '👩', '👦', '👧', '👨‍🦰', '👩‍🦰', '🧔', '👵', '👴', '👲',
+  '👮', '👷', '💂', '🕵️', '😊', '😎', '🐱', '🐶', '🦊', '🦁',
+  '🐼', '🐨', '🐯', '🐸', '🦄', '🐲', '🚀', '⭐', '🌈', '🎨'
+];
 
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<ToolCategory>('All');
@@ -94,11 +107,36 @@ export default function App() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showManageUserModal, setShowManageUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUserHistory, setSelectedUserHistory] = useState<any[]>([]);
+  const [userData, setUserData] = useState<any>(null);
+  const [profileData, setProfileData] = useState({
+    fullName: '',
+    email: '',
+    newPassword: '',
+    avatar: ''
+  });
+  const [adminProfileData, setAdminProfileData] = useState({
+    fullName: '',
+    email: '',
+    avatar: ''
+  });
   const [userHistory, setUserHistory] = useState<any[]>([]);
   const [adminData, setAdminData] = useState<{ users: any[], history: any[], messages: any[] }>({ users: [], history: [], messages: [] });
   const [isAdminLoading, setIsAdminLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<'users' | 'messages'>('users');
   const [currentLanguage, setCurrentLanguage] = useState('English');
+
+  const getUserEmoji = (seed: string) => {
+    const emojis = ['😊', '😎', '🐱', '🐶', '🦊', '🦁', '🐼', '🐨', '🐯', '🐸', '🦄', '🐲', '🚀', '⭐', '🌈', '🎨'];
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return emojis[Math.abs(hash) % emojis.length];
+  };
 
   const translations: any = {
     'English': {
@@ -176,7 +214,16 @@ export default function App() {
       'date': 'Date',
       'target_size': 'Target File Size (MB)',
       'target_size_desc': 'Set desired size for the output file (optional)',
-      'mb': 'MB'
+      'mb': 'MB',
+      'profile_settings': 'Profile Settings',
+      'update_profile': 'Update Profile',
+      'change_password': 'Change Password',
+      'change_email': 'Change Email',
+      'new_password': 'New Password',
+      'save_changes': 'Save Changes',
+      'profile_updated': 'Profile updated successfully!',
+      'email_updated': 'Email updated successfully!',
+      'password_updated': 'Password updated successfully!',
     },
     'Hindi': {
       'home': 'होम',
@@ -265,7 +312,16 @@ export default function App() {
       'date': 'तारीख',
       'target_size': 'लक्ष्य फ़ाइल का आकार (MB)',
       'target_size_desc': 'आउटपुट फ़ाइल के लिए वांछित आकार सेट करें (वैकल्पिक)',
-      'mb': 'MB'
+      'mb': 'MB',
+      'profile_settings': 'प्रोफ़ाइल सेटिंग्स',
+      'update_profile': 'प्रोफ़ाइल अपडेट करें',
+      'change_password': 'पासवर्ड बदलें',
+      'change_email': 'ईमेल बदलें',
+      'new_password': 'नया पासवर्ड',
+      'save_changes': 'बदलाव सहेजें',
+      'profile_updated': 'प्रोफ़ाइल सफलतापूर्वक अपडेट की गई!',
+      'email_updated': 'ईमेल सफलतापूर्वक अपडेट किया गया!',
+      'password_updated': 'पासवर्ड सफलतापूर्वक अपडेट किया गया!',
     },
     'Spanish': {
       'home': 'Inicio',
@@ -467,6 +523,31 @@ export default function App() {
     }
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    try {
+      if (profileData.fullName) {
+        await updateProfile(user, { displayName: profileData.fullName });
+        await setDoc(doc(db, 'users', user.uid), { displayName: profileData.fullName }, { merge: true });
+      }
+      if (profileData.email && profileData.email !== user.email) {
+        await updateEmail(user, profileData.email);
+        await setDoc(doc(db, 'users', user.uid), { email: profileData.email }, { merge: true });
+      }
+      if (profileData.newPassword) {
+        await updatePassword(user, profileData.newPassword);
+      }
+      if (profileData.avatar) {
+        await setDoc(doc(db, 'users', user.uid), { avatar: profileData.avatar }, { merge: true });
+      }
+      setNotification({ message: t('profile_updated'), type: 'success' });
+      setShowProfileModal(false);
+    } catch (error: any) {
+      handleAuthError(error);
+    }
+  };
+
   const isAdmin = user?.email === 'rohit.jnbh8@gmail.com';
 
   const languages = [
@@ -497,6 +578,14 @@ export default function App() {
       if (currentUser) {
         // Sync user to Firestore
         const userRef = doc(db, 'users', currentUser.uid);
+        
+        // Listen to user data
+        onSnapshot(userRef, (doc) => {
+          if (doc.exists()) {
+            setUserData(doc.data());
+          }
+        });
+
         const userSnap = await getDoc(userRef);
         
         if (!userSnap.exists()) {
@@ -505,6 +594,8 @@ export default function App() {
             email: currentUser.email,
             displayName: currentUser.displayName,
             photoURL: currentUser.photoURL,
+            avatar: getUserEmoji(currentUser.uid),
+            role: 'user',
             createdAt: serverTimestamp()
           });
         } else if (!userSnap.data()?.createdAt) {
@@ -514,6 +605,8 @@ export default function App() {
             createdAt: serverTimestamp()
           });
         }
+      } else {
+        setUserData(null);
       }
     });
     return () => unsubscribe();
@@ -533,8 +626,6 @@ export default function App() {
     if (!isAdmin) return;
     setIsAdminLoading(true);
     try {
-      const { getDocs, query, orderBy, limit } = await import('firebase/firestore');
-      
       // Fetch users
       const usersSnap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(50)));
       const usersList = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -548,6 +639,48 @@ export default function App() {
       console.error('Failed to fetch admin data:', error);
     } finally {
       setIsAdminLoading(false);
+    }
+  };
+
+  const fetchUserHistory = async (userId: string) => {
+    try {
+      const historySnap = await getDocs(query(
+        collection(db, 'history'), 
+        where('userId', '==', userId),
+        orderBy('timestamp', 'desc'),
+        limit(20)
+      ));
+      setSelectedUserHistory(historySnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error('Failed to fetch user history:', error);
+    }
+  };
+
+  const handleAdminUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    try {
+      const userRef = doc(db, 'users', selectedUser.id);
+      await updateDoc(userRef, {
+        displayName: adminProfileData.fullName,
+        email: adminProfileData.email,
+        avatar: adminProfileData.avatar
+      });
+      setNotification({ message: 'User updated successfully!', type: 'success' });
+      setShowManageUserModal(false);
+      fetchAdminData();
+    } catch (error: any) {
+      handleAuthError(error);
+    }
+  };
+
+  const handleAdminResetPassword = async () => {
+    if (!selectedUser?.email) return;
+    try {
+      await sendPasswordResetEmail(auth, selectedUser.email);
+      setNotification({ message: `Password reset email sent to ${selectedUser.email}`, type: 'success' });
+    } catch (error: any) {
+      handleAuthError(error);
     }
   };
 
@@ -1178,9 +1311,13 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-200 hover:border-red-500 transition-colors"
+                  className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-200 hover:border-red-500 transition-colors flex items-center justify-center bg-slate-100"
                 >
-                  <img src={user.photoURL || ''} alt={user.displayName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className="text-xl">{userData?.avatar || getUserEmoji(user.uid)}</span>
+                  )}
                 </button>
                 
                 <AnimatePresence>
@@ -1192,7 +1329,13 @@ export default function App() {
                       className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 space-y-4"
                     >
                       <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                        <img src={user.photoURL || ''} alt="" className="w-10 h-10 rounded-full" referrerPolicy="no-referrer" />
+                        {user.photoURL ? (
+                          <img src={user.photoURL} alt="" className="w-10 h-10 rounded-full" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xl">
+                            {userData?.avatar || getUserEmoji(user.uid)}
+                          </div>
+                        )}
                         <div className="overflow-hidden">
                           <p className="font-bold text-slate-800 truncate">{user.displayName}</p>
                           <p className="text-xs text-slate-500 truncate">{user.email}</p>
@@ -1207,6 +1350,21 @@ export default function App() {
                             <ShieldCheck className="w-4 h-4" /> Admin Dashboard
                           </button>
                         )}
+                        <button 
+                          onClick={() => { 
+                            setProfileData({ 
+                              fullName: user.displayName || '', 
+                              email: user.email || '', 
+                              newPassword: '',
+                              avatar: userData?.avatar || getUserEmoji(user.uid)
+                            });
+                            setShowProfileModal(true); 
+                            setShowUserMenu(false); 
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
+                        >
+                          <UserIcon className="w-4 h-4" /> {t('profile_settings')}
+                        </button>
                         <button 
                           onClick={() => { setShowHistoryModal(true); setShowUserMenu(false); }}
                           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
@@ -1474,6 +1632,7 @@ export default function App() {
                           <th className="px-6 py-4">Email</th>
                           <th className="px-6 py-4">Joined At</th>
                           <th className="px-6 py-4">Status</th>
+                          <th className="px-6 py-4">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -1481,7 +1640,13 @@ export default function App() {
                           <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <img src={u.photoURL} alt="" className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
+                                {u.photoURL ? (
+                                  <img src={u.photoURL} alt="" className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm">
+                                    {u.avatar || '👤'}
+                                  </div>
+                                )}
                                 <span className="font-bold text-slate-700">{u.displayName}</span>
                               </div>
                             </td>
@@ -1491,6 +1656,23 @@ export default function App() {
                             </td>
                             <td className="px-6 py-4">
                               <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-full uppercase">Active</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <button 
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setAdminProfileData({
+                                    fullName: u.displayName || '',
+                                    email: u.email || '',
+                                    avatar: u.avatar || ''
+                                  });
+                                  fetchUserHistory(u.id);
+                                  setShowManageUserModal(true);
+                                }}
+                                className="text-xs font-bold text-red-600 hover:underline"
+                              >
+                                Manage
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -2379,6 +2561,222 @@ export default function App() {
                       {t('login')}
                     </button>
                   </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showProfileModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowProfileModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="bg-slate-900 p-8 text-white">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <UserIcon className="w-8 h-8" />
+                    <h2 className="text-3xl font-bold">{t('profile_settings')}</h2>
+                  </div>
+                  <button onClick={() => setShowProfileModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Choose Avatar</label>
+                    <div className="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 border border-slate-100 rounded-xl">
+                      {AVATARS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setProfileData(prev => ({ ...prev, avatar: emoji }))}
+                          className={cn(
+                            "text-2xl p-2 rounded-lg transition-all hover:bg-slate-100",
+                            profileData.avatar === emoji ? "bg-red-50 border-2 border-red-500 scale-110" : "border-2 border-transparent"
+                          )}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('full_name')}</label>
+                    <div className="relative">
+                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="John Doe"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={profileData.fullName}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, fullName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('email_label')}</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="email" 
+                        placeholder="john@example.com"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={profileData.email}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('new_password')}</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="password" 
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                        value={profileData.newPassword}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, newPassword: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95 mt-4"
+                  >
+                    {t('save_changes')}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showManageUserModal && selectedUser && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowManageUserModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row"
+            >
+              {/* Left Side: Edit Profile */}
+              <div className="w-full md:w-1/2 p-8 border-b md:border-b-0 md:border-r border-slate-100">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-2xl font-bold text-slate-800">Manage User</h3>
+                  <button onClick={() => setShowManageUserModal(false)} className="md:hidden p-2 hover:bg-slate-100 rounded-full">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <form onSubmit={handleAdminUpdateUser} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-3">User Avatar</label>
+                    <div className="grid grid-cols-5 gap-2 max-h-32 overflow-y-auto p-2 border border-slate-100 rounded-xl">
+                      {AVATARS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setAdminProfileData(prev => ({ ...prev, avatar: emoji }))}
+                          className={cn(
+                            "text-xl p-2 rounded-lg transition-all hover:bg-slate-100",
+                            adminProfileData.avatar === emoji ? "bg-red-50 border-2 border-red-500 scale-110" : "border-2 border-transparent"
+                          )}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
+                    <input 
+                      type="text" 
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                      value={adminProfileData.fullName}
+                      onChange={(e) => setAdminProfileData(prev => ({ ...prev, fullName: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Address</label>
+                    <input 
+                      type="email" 
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                      value={adminProfileData.email}
+                      onChange={(e) => setAdminProfileData(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="pt-4 space-y-3">
+                    <button 
+                      type="submit"
+                      className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95"
+                    >
+                      Update User Details
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleAdminResetPassword}
+                      className="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Lock className="w-4 h-4" /> Send Password Reset Email
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Right Side: User History */}
+              <div className="w-full md:w-1/2 bg-slate-50 p-8 flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-slate-800">User History</h3>
+                  <button onClick={() => setShowManageUserModal(false)} className="hidden md:block p-2 hover:bg-slate-200 rounded-full transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                  {selectedUserHistory.length > 0 ? (
+                    selectedUserHistory.map((item) => (
+                      <div key={item.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+                            <File className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{item.toolName}</p>
+                            <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{item.fileName}</p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleDateString() : 'Recent'}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12">
+                      <History className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+                      <p className="text-sm text-slate-400">No activity found for this user.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

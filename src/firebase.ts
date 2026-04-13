@@ -8,9 +8,12 @@ import {
   User,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  updateEmail,
+  updatePassword,
+  sendPasswordResetEmail
 } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -25,6 +28,9 @@ export {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
+  updateEmail,
+  updatePassword,
+  sendPasswordResetEmail,
   doc, 
   setDoc, 
   getDoc, 
@@ -35,6 +41,8 @@ export {
   orderBy, 
   limit, 
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  updateDoc,
+  where
 };
 export type { User };
