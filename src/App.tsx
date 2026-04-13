@@ -84,6 +84,174 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<'users' | 'messages'>('users');
   const [currentLanguage, setCurrentLanguage] = useState('English');
 
+  const translations: any = {
+    'English': {
+      'home': 'Home',
+      'about': 'About Us',
+      'contact': 'Contact Us',
+      'help': 'Help & Support',
+      'language': 'Language',
+      'logout': 'Logout',
+      'login': 'Login',
+      'search_placeholder': 'Search for PDF tools (e.g. merge, split, word)...',
+      'all_tools': 'All Tools',
+      'organize_pdf': 'Organize PDF',
+      'optimize_pdf': 'Optimize PDF',
+      'convert_pdf': 'Convert PDF',
+      'edit_pdf': 'Edit PDF',
+      'pdf_security': 'PDF Security',
+      'pdf_intelligence': 'PDF Intelligence',
+      'hero_title': 'Everything you need to manage PDFs in one place — fast, easy, and 100% free',
+      'hero_subtitle': 'Everything for your PDFs, just a click away',
+      'select_files': 'Select PDF files',
+      'or_drop': 'or drop PDFs here',
+      'processing': 'Processing...',
+      'download_ready': 'Your file is ready!',
+      'download_btn': 'Download Now',
+      'back_btn': 'Back to Tools',
+      'admin_dashboard': 'Admin Dashboard',
+      'users': 'Users',
+      'messages': 'Messages',
+      'history': 'History',
+      'workflows': 'Workflows',
+      'all': 'All',
+      'merge_pdf': 'Merge PDF',
+      'split_pdf': 'Split PDF',
+      'compress_pdf': 'Compress PDF',
+      'all_pdf_tools': 'All PDF Tools',
+      'tool_merge_title': 'Merge PDF',
+      'tool_merge_desc': 'Combine multiple PDFs into one document easily.',
+      'tool_split_title': 'Split PDF',
+      'tool_split_desc': 'Extract pages from your PDF or save each page as a separate PDF.',
+      'tool_compress_title': 'Compress PDF',
+      'tool_compress_desc': 'Reduce the size of your PDF while maintaining quality.',
+      'tool_word-to-pdf_title': 'Word to PDF',
+      'tool_word-to-pdf_desc': 'Convert Word documents to PDF with high accuracy.',
+      'tool_pdf-to-word_title': 'PDF to Word',
+      'tool_pdf-to-word_desc': 'Convert PDF files to editable Word documents.',
+      'about_title': 'About RohitPDFHub',
+      'help_title': 'Help & Support',
+      'contact_title': 'Contact Us',
+      'name_label': 'Name',
+      'email_label': 'Email',
+      'message_label': 'Message',
+      'send_btn': 'Send Message',
+      'footer_text': 'The PDF software trusted by millions of users. RohitPDFHub is your number one web app for editing PDF with ease.',
+      'got_it': 'Got it!',
+      'close': 'Close',
+      'faq_title': 'Frequently Asked Questions',
+      'privacy_first': 'Privacy First',
+      'our_mission': 'Our Mission'
+    },
+    'Hindi': {
+      'home': 'होम',
+      'about': 'हमारे बारे में',
+      'contact': 'संपर्क करें',
+      'help': 'सहायता और समर्थन',
+      'language': 'भाषा',
+      'logout': 'लॉगआउट',
+      'login': 'लॉगिन',
+      'search_placeholder': 'PDF टूल्स खोजें (जैसे merge, split, word)...',
+      'all_tools': 'सभी टूल्स',
+      'organize_pdf': 'PDF व्यवस्थित करें',
+      'optimize_pdf': 'PDF अनुकूलित करें',
+      'convert_pdf': 'PDF बदलें',
+      'edit_pdf': 'PDF संपादित करें',
+      'pdf_security': 'PDF सुरक्षा',
+      'pdf_intelligence': 'PDF इंटेलिजेंस',
+      'hero_title': 'PDF को मैनेज करने के लिए आपकी ज़रूरत की हर चीज़ एक ही जगह पर — तेज़, आसान और 100% मुफ़्त',
+      'hero_subtitle': 'आपके PDF के लिए सब कुछ, बस एक क्लिक दूर',
+      'select_files': 'PDF फाइलें चुनें',
+      'or_drop': 'या PDF यहाँ छोड़ें',
+      'processing': 'प्रसंस्करण हो रहा है...',
+      'download_ready': 'आपकी फ़ाइल तैयार है!',
+      'download_btn': 'अभी डाउनलोड करें',
+      'back_btn': 'टूल्स पर वापस जाएं',
+      'admin_dashboard': 'एडमिन डैशबोर्ड',
+      'users': 'उपयोगकर्ता',
+      'messages': 'संदेश',
+      'history': 'इतिहास',
+      'workflows': 'वर्कफ़्लो',
+      'all': 'सभी',
+      'merge_pdf': 'मर्ज PDF',
+      'split_pdf': 'स्प्लिट PDF',
+      'compress_pdf': 'कंप्रेस PDF',
+      'all_pdf_tools': 'सभी PDF टूल्स',
+      'tool_merge_title': 'मर्ज PDF',
+      'tool_merge_desc': 'आसानी से कई PDF को एक दस्तावेज़ में जोड़ें।',
+      'tool_split_title': 'स्प्लिट PDF',
+      'tool_split_desc': 'अपने PDF से पेज निकालें या प्रत्येक पेज को अलग PDF के रूप में सहेजें।',
+      'tool_compress_title': 'कंप्रेस PDF',
+      'tool_compress_desc': 'गुणवत्ता बनाए रखते हुए अपने PDF का आकार कम करें।',
+      'tool_word-to-pdf_title': 'Word से PDF',
+      'tool_word-to-pdf_desc': 'उच्च सटीकता के साथ Word दस्तावेज़ों को PDF में बदलें।',
+      'tool_pdf-to-word_title': 'PDF से Word',
+      'tool_pdf-to-word_desc': 'PDF फ़ाइलों को संपादन योग्य Word दस्तावेज़ों में बदलें।',
+      'about_title': 'RohitPDFHub के बारे में',
+      'help_title': 'सहायता और समर्थन',
+      'contact_title': 'संपर्क करें',
+      'name_label': 'नाम',
+      'email_label': 'ईमेल',
+      'message_label': 'संदेश',
+      'send_btn': 'संदेश भेजें',
+      'footer_text': 'लाखों उपयोगकर्ताओं द्वारा भरोसा किया गया PDF सॉफ़्टवेयर। RohitPDFHub आसानी से PDF संपादित करने के लिए आपका नंबर एक वेब ऐप है।',
+      'got_it': 'समझ गया!',
+      'close': 'बंद करें',
+      'faq_title': 'अक्सर पूछे जाने वाले प्रश्न',
+      'privacy_first': 'गोपनीयता पहले',
+      'our_mission': 'हमारा मिशन'
+    },
+    'Spanish': {
+      'home': 'Inicio',
+      'about': 'Sobre nosotros',
+      'contact': 'Contáctenos',
+      'help': 'Ayuda y soporte',
+      'language': 'Idioma',
+      'logout': 'Cerrar sesión',
+      'login': 'Iniciar sesión',
+      'search_placeholder': 'Buscar herramientas PDF...',
+      'all_tools': 'Todas las herramientas',
+      'organize_pdf': 'Organizar PDF',
+      'optimize_pdf': 'Optimizar PDF',
+      'convert_pdf': 'Convertir PDF',
+      'edit_pdf': 'Editar PDF',
+      'pdf_security': 'Seguridad PDF',
+      'pdf_intelligence': 'Inteligencia PDF',
+      'hero_title': 'Cada herramienta que necesitas para trabajar con PDF',
+      'hero_subtitle': 'Todas las herramientas PDF al alcance de tu mano. ¡100% GRATIS y fáciles de usar!',
+      'select_files': 'Seleccionar archivos PDF',
+      'or_drop': 'o soltar PDF aquí',
+      'processing': 'Procesando...',
+      'download_ready': '¡Tu archivo está listo!',
+      'download_btn': 'Descargar ahora',
+      'back_btn': 'Volver a herramientas'
+    }
+  };
+
+  const t = (key: string) => {
+    return translations[currentLanguage]?.[key] || translations['English'][key] || key;
+  };
+
+  const translateCategory = (cat: string) => {
+    const key = cat.toLowerCase().replace(/\s+/g, '_');
+    return t(key);
+  };
+
+  const translateTool = (tool: any) => {
+    if (!tool) return tool;
+    const titleKey = `tool_${tool.id}_title`;
+    const descKey = `tool_${tool.id}_desc`;
+    
+    const translatedTitle = t(titleKey);
+    const translatedDesc = t(descKey);
+    
+    return {
+      ...tool,
+      title: translatedTitle !== titleKey ? translatedTitle : tool.title,
+      description: translatedDesc !== descKey ? translatedDesc : tool.description
+    };
+  };
+
   const isAdmin = user?.email === 'rohit.jnbh8@gmail.com';
 
   const languages = [
@@ -698,31 +866,31 @@ export default function App() {
               onClick={() => setSelectedTool(TOOLS.find(t => t.id === 'merge') || null)}
               className="hover:text-red-600 transition-colors"
             >
-              Merge PDF
+              {t('merge_pdf')}
             </button>
             <button 
               onClick={() => setSelectedTool(TOOLS.find(t => t.id === 'split') || null)}
               className="hover:text-red-600 transition-colors"
             >
-              Split PDF
+              {t('split_pdf')}
             </button>
             <button 
               onClick={() => setSelectedTool(TOOLS.find(t => t.id === 'compress') || null)}
               className="hover:text-red-600 transition-colors"
             >
-              Compress PDF
+              {t('compress_pdf')}
             </button>
             <button 
               onClick={() => { setActiveCategory('Convert PDF'); setSelectedTool(null); }}
               className="flex items-center gap-1 hover:text-red-600 transition-colors"
             >
-              Convert PDF <ChevronDown className="w-4 h-4" />
+              {t('convert_pdf')} <ChevronDown className="w-4 h-4" />
             </button>
             <button 
               onClick={() => { setActiveCategory('All'); setSelectedTool(null); }}
               className="flex items-center gap-1 hover:text-red-600 transition-colors"
             >
-              All PDF Tools <ChevronDown className="w-4 h-4" />
+              {t('all_pdf_tools')} <ChevronDown className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -782,13 +950,13 @@ export default function App() {
                           onClick={() => { setShowAboutModal(true); setShowUserMenu(false); }}
                           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
                         >
-                          <Info className="w-4 h-4" /> About RohitPDFHub
+                          <Info className="w-4 h-4" /> {t('about')}
                         </button>
                         <button 
                           onClick={() => { setShowHelpModal(true); setShowUserMenu(false); }}
                           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
                         >
-                          <HelpCircle className="w-4 h-4" /> Help & Support
+                          <HelpCircle className="w-4 h-4" /> {t('help')}
                         </button>
                         <div className="relative">
                           <button 
@@ -832,7 +1000,7 @@ export default function App() {
                           onClick={handleLogout}
                           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 text-sm font-medium transition-colors"
                         >
-                          <LogOut className="w-4 h-4" /> Logout
+                          <LogOut className="w-4 h-4" /> {t('logout')}
                         </button>
                       </div>
                     </motion.div>
@@ -844,7 +1012,7 @@ export default function App() {
                 onClick={handleLogin}
                 className="bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-red-700 transition-all shadow-md active:scale-95"
               >
-                Login
+                {t('login')}
               </button>
             )}
           </div>
@@ -874,13 +1042,13 @@ export default function App() {
                       onClick={() => { setShowAboutModal(true); setShowMobileMenu(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-700 font-bold transition-colors"
                     >
-                      <Info className="w-5 h-5 text-red-500" /> About Us
+                      <Info className="w-5 h-5 text-red-500" /> {t('about')}
                     </button>
                     <button 
                       onClick={() => { setShowContactModal(true); setShowMobileMenu(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-700 font-bold transition-colors"
                     >
-                      <HelpCircle className="w-5 h-5 text-blue-500" /> Contact Us
+                      <HelpCircle className="w-5 h-5 text-blue-500" /> {t('contact')}
                     </button>
                     <div className="relative">
                       <button 
@@ -888,7 +1056,7 @@ export default function App() {
                         className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-700 font-bold transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <Languages className="w-5 h-5 text-green-500" /> Language
+                          <Languages className="w-5 h-5 text-green-500" /> {t('language')}
                         </div>
                         <span className="text-xs text-slate-400">{currentLanguage}</span>
                       </button>
@@ -1115,10 +1283,10 @@ export default function App() {
               {/* Hero */}
               <div className="text-center space-y-4 max-w-4xl mx-auto">
                 <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.1]">
-                  Everything you need to manage PDFs in one place — <span className="text-red-600">fast, easy, and 100% free</span>
+                  {t('hero_title')}
                 </h1>
                 <p className="text-slate-500 text-xl max-w-2xl mx-auto">
-                  Everything for your PDFs, just a click away
+                  {t('hero_subtitle')}
                 </p>
               </div>
 
@@ -1135,38 +1303,41 @@ export default function App() {
                         : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                     )}
                   >
-                    {cat}
+                    {translateCategory(cat)}
                   </button>
                 ))}
               </div>
 
               {/* Tool Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {filteredTools.map((tool) => (
-                  <motion.div
-                    key={tool.id}
-                    layoutId={tool.id}
-                    onClick={() => setSelectedTool(tool)}
-                    whileHover={{ y: -5 }}
-                    className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
-                  >
-                    <div className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4 transition-transform group-hover:scale-110",
-                      tool.color
-                    )}>
-                      <tool.icon className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-red-600 transition-colors">
-                      {tool.title}
-                    </h3>
-                    <p className="text-slate-500 text-sm leading-relaxed">
-                      {tool.description}
-                    </p>
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Plus className="w-4 h-4 text-slate-300" />
-                    </div>
-                  </motion.div>
-                ))}
+                {filteredTools.map((tool) => {
+                  const tTool = translateTool(tool);
+                  return (
+                    <motion.div
+                      key={tool.id}
+                      layoutId={tool.id}
+                      onClick={() => setSelectedTool(tool)}
+                      whileHover={{ y: -5 }}
+                      className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-xl transition-all duration-300 group relative overflow-hidden"
+                    >
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4 transition-transform group-hover:scale-110",
+                        tool.color
+                      )}>
+                        <tool.icon className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-red-600 transition-colors">
+                        {tTool.title}
+                      </h3>
+                      <p className="text-slate-500 text-sm leading-relaxed">
+                        {tTool.description}
+                      </p>
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Plus className="w-4 h-4 text-slate-300" />
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           ) : (
@@ -1192,8 +1363,8 @@ export default function App() {
                       <selectedTool.icon className="w-8 h-8" />
                     </div>
                     <div>
-                      <h2 className="text-3xl font-bold text-slate-800">{selectedTool.title}</h2>
-                      <p className="text-slate-500 mt-1">{selectedTool.description}</p>
+                      <h2 className="text-3xl font-bold text-slate-800">{translateTool(selectedTool).title}</h2>
+                      <p className="text-slate-500 mt-1">{translateTool(selectedTool).description}</p>
                     </div>
                   </div>
 
@@ -1369,7 +1540,7 @@ export default function App() {
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
                     <Info className="w-8 h-8" />
-                    <h2 className="text-3xl font-bold">About RohitPDFHub</h2>
+                    <h2 className="text-3xl font-bold">{t('about_title')}</h2>
                   </div>
                   <button onClick={() => setShowAboutModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                     <X className="w-6 h-6" />
@@ -1383,13 +1554,13 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                   <div className="space-y-2">
                     <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-red-500" /> Our Mission
+                      <Globe className="w-4 h-4 text-red-500" /> {t('our_mission')}
                     </h4>
                     <p className="text-sm">To democratize document management by providing high-quality tools that are accessible to everyone, everywhere.</p>
                   </div>
                   <div className="space-y-2">
                     <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-red-500" /> Privacy First
+                      <ShieldCheck className="w-4 h-4 text-red-500" /> {t('privacy_first')}
                     </h4>
                     <p className="text-sm">We believe in absolute privacy. Your files are processed locally in your browser whenever possible, ensuring your data never leaves your device.</p>
                   </div>
@@ -1399,7 +1570,7 @@ export default function App() {
                     onClick={() => setShowAboutModal(false)}
                     className="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-900 transition-all active:scale-95"
                   >
-                    Got it!
+                    {t('got_it')}
                   </button>
                 </div>
               </div>
@@ -1426,7 +1597,7 @@ export default function App() {
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
                     <HelpCircle className="w-8 h-8" />
-                    <h2 className="text-3xl font-bold">Help & Support</h2>
+                    <h2 className="text-3xl font-bold">{t('help_title')}</h2>
                   </div>
                   <button onClick={() => setShowHelpModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                     <X className="w-6 h-6" />
@@ -1435,7 +1606,7 @@ export default function App() {
               </div>
               <div className="p-8 space-y-6">
                 <div className="space-y-4">
-                  <h3 className="text-xl font-bold text-slate-800">Frequently Asked Questions</h3>
+                  <h3 className="text-xl font-bold text-slate-800">{t('faq_title')}</h3>
                   <div className="space-y-3">
                     <details className="group border border-slate-100 rounded-xl p-4 cursor-pointer hover:bg-slate-50 transition-colors">
                       <summary className="font-bold text-slate-700 flex justify-between items-center">
@@ -1466,7 +1637,7 @@ export default function App() {
                     onClick={() => setShowHelpModal(false)}
                     className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95"
                   >
-                    Close
+                    {t('close')}
                   </button>
                 </div>
               </div>
@@ -1493,7 +1664,7 @@ export default function App() {
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
                     <HelpCircle className="w-8 h-8" />
-                    <h2 className="text-3xl font-bold">Contact Us</h2>
+                    <h2 className="text-3xl font-bold">{t('contact_title')}</h2>
                   </div>
                   <button onClick={() => setShowContactModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                     <X className="w-6 h-6" />
@@ -1525,19 +1696,19 @@ export default function App() {
                   }
                 }}>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Name</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">{t('name_label')}</label>
                     <input name="name" type="text" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all" placeholder="Your name" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">{t('email_label')}</label>
                     <input name="email" type="email" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all" placeholder="your@email.com" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Message</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">{t('message_label')}</label>
                     <textarea name="message" required rows={4} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none" placeholder="How can we help?"></textarea>
                   </div>
                   <button type="submit" className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-100">
-                    Send Message
+                    {t('send_btn')}
                   </button>
                 </form>
               </div>
@@ -1608,7 +1779,7 @@ export default function App() {
               <span className="text-xl font-bold tracking-tighter">ROHITPDFHUB</span>
             </div>
             <p className="text-sm leading-relaxed">
-              The PDF software trusted by millions of users. RohitPDFHub is your number one web app for editing PDF with ease.
+              {t('footer_text')}
             </p>
           </div>
           
