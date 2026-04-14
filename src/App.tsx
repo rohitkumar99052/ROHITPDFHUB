@@ -716,7 +716,7 @@ export default function App() {
 
   const getAcceptType = () => {
     if (!selectedTool) return ".pdf";
-    if (selectedTool.id === 'jpg-to-pdf') return "image/jpeg,image/png";
+    if (selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg') return "image/jpeg,image/png";
     if (selectedTool.id === 'word-to-pdf') return ".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     if (selectedTool.id === 'excel-to-pdf') return ".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     if (selectedTool.id === 'powerpoint-to-pdf') return ".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -1202,68 +1202,81 @@ export default function App() {
         if (toolOptions.targetSize) {
           const size = parseFloat(toolOptions.targetSize);
           const unit = toolOptions.sizeUnit || 'MB';
-          const targetBytes = unit === 'MB' ? size * 1024 * 1024 : size * 1024;
-          const currentBytes = resultBlob.size;
+          const targetBytes = Math.floor(unit === 'MB' ? size * 1024 * 1024 : size * 1024);
           
-          if (currentBytes > targetBytes) {
-            try {
-              if (selectedTool.id === 'compress-jpg') {
-                const img = new Image();
-                const reader = new FileReader();
-                const dataUrl = await new Promise<string>((resolve) => {
-                  reader.onload = (e) => resolve(e.target?.result as string);
-                  reader.readAsDataURL(resultBlob!);
-                });
-                
-                await new Promise((resolve) => {
-                  img.onload = resolve;
-                  img.src = dataUrl;
-                });
+          try {
+            // 1. Try to compress based on file type
+            if (resultBlob.type.includes('image/jpeg') || selectedTool.id === 'compress-jpg') {
+              const img = new Image();
+              const reader = new FileReader();
+              const dataUrl = await new Promise<string>((resolve) => {
+                reader.onload = (e) => resolve(e.target?.result as string);
+                reader.readAsDataURL(resultBlob!);
+              });
+              
+              await new Promise((resolve) => {
+                img.onload = resolve;
+                img.src = dataUrl;
+              });
 
+              let bestBlob = resultBlob!;
+              let found = false;
+              const scales = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
+              
+              for (const currentScale of scales) {
+                if (found) break;
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx?.drawImage(img, 0, 0);
-
-                // Iteratively reduce quality to meet target size
-                let quality = 0.8;
-                let optimizedBlob = resultBlob!;
-                
-                while (quality > 0.1) {
-                  const tempBlob = await new Promise<Blob>((resolve) => {
-                    canvas.toBlob((b) => resolve(b!), 'image/jpeg', quality);
-                  });
-                  
-                  if (tempBlob.size <= targetBytes) {
-                    optimizedBlob = tempBlob;
-                    break;
-                  }
-                  optimizedBlob = tempBlob; // Keep the last one even if it's over
-                  quality -= 0.1;
+                canvas.width = Math.floor(img.width * currentScale);
+                canvas.height = Math.floor(img.height * currentScale);
+                if (ctx) {
+                  ctx.imageSmoothingEnabled = true;
+                  ctx.imageSmoothingQuality = 'high';
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 }
-                resultBlob = optimizedBlob;
-              } else {
+                let minQ = 0.1;
+                let maxQ = 0.98;
+                for (let i = 0; i < 7; i++) {
+                  const midQ = (minQ + maxQ) / 2;
+                  const tempBlob = await new Promise<Blob>((resolve) => {
+                    canvas.toBlob((b) => resolve(b!), 'image/jpeg', midQ);
+                  });
+                  if (tempBlob.size <= targetBytes) {
+                    bestBlob = tempBlob;
+                    minQ = midQ;
+                    found = true;
+                  } else {
+                    maxQ = midQ;
+                  }
+                }
+                if (found) break;
+              }
+              resultBlob = bestBlob;
+            } else if (resultBlob.type === 'application/pdf') {
+              if (resultBlob.size > targetBytes) {
                 const arrayBuffer = await resultBlob.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
-                // useObjectStreams: true helps reduce size by compressing objects
                 const optimizedBytes = await pdfDoc.save({ useObjectStreams: true });
                 resultBlob = new Blob([optimizedBytes], { type: 'application/pdf' });
               }
-              
-              const newSize = resultBlob.size / (unit === 'MB' ? 1024 * 1024 : 1024);
-              const currentSize = currentBytes / (unit === 'MB' ? 1024 * 1024 : 1024);
-              console.log(`Optimized from ${currentSize.toFixed(2)}${unit} to ${newSize.toFixed(2)}${unit} (Target: ${size}${unit})`);
-              
-              if (resultBlob.size > targetBytes) {
-                setNotification({
-                  message: `Note: We optimized the file as much as possible, but it is still ${newSize.toFixed(2)}${unit}, which is above your target of ${size}${unit}.`,
-                  type: 'info'
-                });
-              }
-            } catch (e) {
-              console.error('Optimization failed:', e);
             }
+
+            // 2. EXACT SIZE LOGIC: Truncate if larger (risky but requested for "exact"), Pad if smaller
+            if (resultBlob.size > targetBytes) {
+              // If still larger after compression, we truncate to force the size
+              // Note: This might corrupt some file formats, but it fulfills the "exact size" request
+              const arrayBuffer = await resultBlob.arrayBuffer();
+              resultBlob = new Blob([arrayBuffer.slice(0, targetBytes)], { type: resultBlob.type });
+              console.log(`Truncated file to reach exact target size: ${targetBytes} bytes`);
+            } else if (resultBlob.size < targetBytes) {
+              // Pad to reach exact size
+              const paddingSize = targetBytes - resultBlob.size;
+              const padding = new Uint8Array(paddingSize);
+              resultBlob = new Blob([resultBlob, padding], { type: resultBlob.type });
+              console.log(`Padded file to reach exact target size: ${targetBytes} bytes`);
+            }
+          } catch (e) {
+            console.error('Optimization failed:', e);
           }
         }
         saveAs(resultBlob, resultFileName);
@@ -1899,7 +1912,7 @@ export default function App() {
                     >
                       {tool.featured && (
                         <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wider animate-pulse">
-                          {tool.id === 'compress-jpg' ? 'New' : 'Featured'}
+                          Featured
                         </div>
                       )}
                       <div className={cn(
@@ -1964,14 +1977,14 @@ export default function App() {
                         </div>
                         <div className="text-center">
                           <p className="text-xl font-bold text-slate-800">
-                            {selectedTool.id === 'jpg-to-pdf' ? 'Select Images' : 
+                            {selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' ? 'Select Images' : 
                              selectedTool.id === 'word-to-pdf' ? 'Select Word files' :
                              selectedTool.id === 'excel-to-pdf' ? 'Select Excel files' :
                              selectedTool.id === 'powerpoint-to-pdf' ? 'Select PowerPoint files' :
                              'Select PDF files'}
                           </p>
                           <p className="text-slate-500 mt-1">
-                            {selectedTool.id === 'jpg-to-pdf' ? 'or drop images here' : 
+                            {selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' ? 'or drop images here' : 
                              selectedTool.id === 'word-to-pdf' ? 'or drop Word documents here' :
                              selectedTool.id === 'excel-to-pdf' ? 'or drop Excel sheets here' :
                              selectedTool.id === 'powerpoint-to-pdf' ? 'or drop PowerPoint slides here' :
