@@ -275,10 +275,10 @@ export default function App() {
       'tool_compress_desc': 'गुणवत्ता बनाए रखते हुए अपने PDF का आकार कम करें।',
       'tool_compress-jpg_title': 'कंप्रेस JPG',
       'tool_compress-jpg_desc': 'गुणवत्ता बनाए रखते हुए अपनी JPG इमेज का आकार कम करें। अपना लक्ष्य आकार MB या KB में सेट करें।',
-      'tool_word-to-pdf_title': 'Word से PDF',
-      'tool_word-to-pdf_desc': 'उच्च सटीकता के साथ Word दस्तावेज़ों को PDF में बदलें।',
-      'tool_pdf-to-word_title': 'PDF से Word',
-      'tool_pdf-to-word_desc': 'PDF फ़ाइलों को संपादन योग्य Word दस्तावेज़ों में बदलें।',
+      'tool_word-to-pdf_title': 'Word से PDF (Pro)',
+      'tool_word-to-pdf_desc': 'Word दस्तावेज़ों को पिक्सेल-परफेक्ट एक्यूरेसी के साथ PDF में बदलें।',
+      'tool_pdf-to-word_title': 'PDF से Word (Pro)',
+      'tool_pdf-to-word_desc': 'PDF फ़ाइलों को लेआउट और इमेज के साथ संपादन योग्य Word दस्तावेज़ों में बदलें।',
       'tool_jpg-to-pdf_title': 'JPG से PDF',
       'tool_jpg-to-pdf_desc': 'JPG छवियों को सेकंडों में PDF में बदलें।',
       'tool_pdf-to-jpg_title': 'PDF से JPG',
@@ -333,6 +333,10 @@ export default function App() {
       'profile_updated': 'प्रोफ़ाइल सफलतापूर्वक अपडेट की गई!',
       'email_updated': 'ईमेल सफलतापूर्वक अपडेट किया गया!',
       'password_updated': 'पासवर्ड सफलतापूर्वक अपडेट किया गया!',
+      'conversion_pro_engine': 'प्रो फिडेलिटी इंजन (Pro Fidelity Engine)',
+      'rendering_pixel_perfect': 'पिक्सेल-परफेक्ट एक्यूरेसी के साथ रेंडर हो रहा है...',
+      'optimizing_layout': 'लेआउट और बॉर्डर्स को ऑप्टिमाइज़ किया जा रहा है...',
+      'finalizing_page': 'पेज {current} / {total} को अंतिम रूप दिया जा रहा है...',
     },
     'Spanish': {
       'home': 'Inicio',
@@ -431,8 +435,14 @@ export default function App() {
     }
   }, [showHistoryModal, fetchHistory]);
 
-  const t = (key: string) => {
-    return translations[currentLanguage]?.[key] || translations['English'][key] || key;
+  const t = (key: string, params?: Record<string, any>) => {
+    let text = translations[currentLanguage]?.[key] || translations['English'][key] || key;
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(`{${k}}`, String(v));
+      });
+    }
+    return text;
   };
 
   const translateCategory = (cat: string) => {
@@ -897,41 +907,321 @@ export default function App() {
         }
 
         case 'pdf-to-word': {
-          console.log('Starting PDF to Word conversion...');
-          const text = await extractText(firstFileBytes);
-          console.log('Text extracted, creating Word document...');
-          
-          // Split text into paragraphs for better Word formatting
-          const paragraphs = text.split('\n').filter(p => p.trim() !== '').map(p => 
-            new docx.Paragraph({
-              children: [new docx.TextRun(p)],
-              spacing: { after: 200 }
-            })
-          );
+          console.log('Starting High-Fidelity PDF to Word conversion...');
+          try {
+            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(firstFileBytes) });
+            const pdf = await loadingTask.promise;
+            const numPages = pdf.numPages;
+            
+            const sections: any[] = [];
 
-          const doc = new docx.Document({
-            sections: [{
-              properties: {},
-              children: paragraphs.length > 0 ? paragraphs : [new docx.Paragraph("No text found in PDF.")],
-            }],
-          });
+            for (let i = 1; i <= numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const viewport = page.getViewport({ scale: 1.0 });
+              
+              const pageChildren: any[] = [];
+              
+              // 1. Extract Images from Page
+              const operatorList = await page.getOperatorList();
+              const images: { data: Uint8Array, x: number, y: number, w: number, h: number }[] = [];
+              
+              for (let j = 0; j < operatorList.fnArray.length; j++) {
+                const fn = operatorList.fnArray[j];
+                if (fn === pdfjsLib.OPS.paintImageXObject || fn === pdfjsLib.OPS.paintInlineImageXObject) {
+                  const imgName = operatorList.argsArray[j][0];
+                  try {
+                    const img = await page.objs.get(imgName);
+                    if (img && img.data) {
+                      let matrix = [1, 0, 0, 1, 0, 0];
+                      for (let k = j - 1; k >= 0; k--) {
+                        if (operatorList.fnArray[k] === pdfjsLib.OPS.transform) {
+                          matrix = operatorList.argsArray[k];
+                          break;
+                        }
+                      }
+                      
+                      const canvas = document.createElement('canvas');
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                        const imageData = ctx.createImageData(img.width, img.height);
+                        if (img.data.length === img.width * img.height * 3) {
+                          for (let p = 0, q = 0; p < img.data.length; p += 3, q += 4) {
+                            imageData.data[q] = img.data[p];
+                            imageData.data[q+1] = img.data[p+1];
+                            imageData.data[q+2] = img.data[p+2];
+                            imageData.data[q+3] = 255;
+                          }
+                        } else {
+                          imageData.data.set(img.data);
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        const dataUrl = canvas.toDataURL('image/png');
+                        const base64 = dataUrl.split(',')[1];
+                        const buffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                        
+                        images.push({
+                          data: buffer,
+                          x: matrix[4],
+                          y: viewport.height - matrix[5] - matrix[3],
+                          w: matrix[0],
+                          h: matrix[3]
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Failed to extract image:', e);
+                  }
+                }
+              }
 
-          const buffer = await docx.Packer.toBlob(doc);
-          resultBlob = buffer;
-          resultFileName = firstFile.name.replace('.pdf', '.docx');
-          console.log('Word document created successfully');
+              if (textContent.items.length === 0 && images.length === 0) {
+                console.log(`Empty page ${i}, rendering full page as image...`);
+                try {
+                  const canvas = document.createElement('canvas');
+                  const context = canvas.getContext('2d');
+                  const scale = 2.0;
+                  const imgViewport = page.getViewport({ scale });
+                  canvas.height = imgViewport.height;
+                  canvas.width = imgViewport.width;
+                  
+                  if (context) {
+                    await page.render({ canvasContext: context, viewport: imgViewport, canvas: canvas as any }).promise;
+                    const imgData = canvas.toDataURL('image/png');
+                    const base64 = imgData.split(',')[1];
+                    const imgBuffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                    
+                    pageChildren.push(
+                      new docx.Paragraph({
+                        children: [
+                          new docx.ImageRun({
+                            data: imgBuffer,
+                            transformation: {
+                              width: viewport.width,
+                              height: viewport.height,
+                            },
+                          } as any),
+                        ],
+                      })
+                    );
+                  }
+                } catch (imgErr) {
+                  console.error(`Failed to render page ${i} as image:`, imgErr);
+                  pageChildren.push(new docx.Paragraph("No content found on this page."));
+                }
+              } else {
+                const lines: { [key: number]: any[] } = {};
+                textContent.items.forEach((item: any) => {
+                  const y = Math.round(item.transform[5]);
+                  if (!lines[y]) lines[y] = [];
+                  lines[y].push(item);
+                });
+
+                const sortedY = Object.keys(lines).sort((a, b) => parseInt(b) - parseInt(a));
+                
+                for (const y of sortedY) {
+                  const lineItems = lines[parseInt(y)].sort((a: any, b: any) => a.transform[4] - b.transform[4]);
+                  const currentY = viewport.height - parseInt(y);
+                  const imagesToPlace = images.filter(img => img.y < currentY && !((img as any).placed));
+                  imagesToPlace.forEach(img => {
+                    pageChildren.push(
+                      new docx.Paragraph({
+                        children: [
+                          new docx.ImageRun({
+                            data: img.data,
+                            transformation: {
+                              width: img.w,
+                              height: img.h,
+                            },
+                          } as any),
+                        ],
+                        alignment: docx.AlignmentType.CENTER
+                      })
+                    );
+                    (img as any).placed = true;
+                  });
+
+                  const runs: any[] = [];
+                  lineItems.forEach((item: any, idx: number) => {
+                    const fontSize = Math.sqrt(item.transform[0] * item.transform[0] + item.transform[1] * item.transform[1]);
+                    const isBold = item.fontName?.toLowerCase().includes('bold') || false;
+                    const isItalic = item.fontName?.toLowerCase().includes('italic') || false;
+                    
+                    if (idx > 0) {
+                      const prevItem = lineItems[idx - 1];
+                      const gap = item.transform[4] - (prevItem.transform[4] + prevItem.width);
+                      if (gap > fontSize * 1.5) {
+                        const numTabs = Math.max(1, Math.floor(gap / (fontSize * 4)));
+                        const tabRuns = Array(numTabs).fill(0).map(() => new docx.TextRun({ text: '\t' }));
+                        runs.push(...tabRuns);
+                      } else if (gap > fontSize * 0.5) {
+                        runs.push(new docx.TextRun({ text: ' ', size: Math.round(fontSize * 2) }));
+                      }
+                    }
+
+                    runs.push(new docx.TextRun({
+                      text: item.str,
+                      size: Math.round(fontSize * 2),
+                      bold: isBold,
+                      italics: isItalic,
+                    }));
+                  });
+
+                  pageChildren.push(
+                    new docx.Paragraph({
+                      children: runs,
+                      spacing: { after: 100 },
+                    })
+                  );
+                }
+
+                images.filter(img => !((img as any).placed)).forEach(img => {
+                  pageChildren.push(
+                    new docx.Paragraph({
+                      children: [
+                        new docx.ImageRun({
+                          data: img.data,
+                          transformation: {
+                            width: img.w,
+                            height: img.h,
+                          },
+                        } as any),
+                      ],
+                      alignment: docx.AlignmentType.CENTER
+                    })
+                  );
+                });
+              }
+
+              sections.push({
+                properties: {
+                  page: {
+                    size: {
+                      width: 11907,
+                      height: 16840,
+                    },
+                    margin: {
+                      top: 720,
+                      bottom: 720,
+                      left: 720,
+                      right: 720,
+                    }
+                  }
+                },
+                children: pageChildren,
+              });
+            }
+
+            const doc = new docx.Document({
+              sections: sections
+            });
+
+            const buffer = await docx.Packer.toBlob(doc);
+            resultBlob = buffer;
+            resultFileName = firstFile.name.replace(/\.pdf$/i, '.docx');
+            if (!resultFileName.endsWith('.docx')) resultFileName += '.docx';
+            console.log('High-Fidelity Word document created successfully');
+
+          } catch (err: any) {
+            console.error('High-Fidelity PDF to Word error:', err);
+            const text = await extractText(firstFileBytes);
+            const paragraphs = text.split('\n').filter(p => p.trim() !== '').map(p => 
+              new docx.Paragraph({
+                children: [new docx.TextRun(p)],
+                spacing: { after: 200 }
+              })
+            );
+            const doc = new docx.Document({
+              sections: [{
+                properties: {
+                  page: {
+                    size: { width: 11907, height: 16840 }
+                  }
+                },
+                children: paragraphs.length > 0 ? paragraphs : [new docx.Paragraph("No text found in PDF.")],
+              }],
+            });
+            const buffer = await docx.Packer.toBlob(doc);
+            resultBlob = buffer;
+            resultFileName = `fallback_${firstFile.name.replace(/\.pdf$/i, '.docx')}`;
+            if (!resultFileName.endsWith('.docx')) resultFileName += '.docx';
+          }
           break;
         }
 
         case 'pdf-to-excel': {
-          const text = await extractText(firstFileBytes);
-          const rows = text.split('\n').map(line => [line]);
-          const ws = XLSX.utils.aoa_to_sheet(rows);
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-          const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-          resultBlob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          resultFileName = firstFile.name.replace('.pdf', '.xlsx');
+          console.log('Starting Advanced PDF to Excel conversion...');
+          try {
+            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(firstFileBytes) });
+            const pdf = await loadingTask.promise;
+            const numPages = pdf.numPages;
+            
+            const allRows: any[][] = [];
+
+            for (let i = 1; i <= numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              
+              const lines: { [key: number]: any[] } = {};
+              textContent.items.forEach((item: any) => {
+                const y = Math.round(item.transform[5]);
+                if (!lines[y]) lines[y] = [];
+                lines[y].push(item);
+              });
+
+              const sortedY = Object.keys(lines).sort((a, b) => parseInt(b) - parseInt(a));
+              
+              for (const y of sortedY) {
+                const lineItems = lines[parseInt(y)].sort((a: any, b: any) => a.transform[4] - b.transform[4]);
+                
+                const row: string[] = [];
+                let currentCell = "";
+                
+                lineItems.forEach((item: any, idx: number) => {
+                  const fontSize = Math.sqrt(item.transform[0] * item.transform[0] + item.transform[1] * item.transform[1]);
+                  
+                  if (idx > 0) {
+                    const prevItem = lineItems[idx - 1];
+                    const gap = item.transform[4] - (prevItem.transform[4] + prevItem.width);
+                    
+                    // If gap is large, it's a new cell
+                    if (gap > fontSize * 1.5) {
+                      row.push(currentCell.trim());
+                      currentCell = item.str;
+                    } else {
+                      currentCell += " " + item.str;
+                    }
+                  } else {
+                    currentCell = item.str;
+                  }
+                });
+                row.push(currentCell.trim());
+                allRows.push(row);
+              }
+              allRows.push([]); // Empty row between pages
+            }
+
+            const ws = XLSX.utils.aoa_to_sheet(allRows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            resultBlob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            resultFileName = firstFile.name.replace(/\.pdf$/i, '.xlsx');
+            if (!resultFileName.endsWith('.xlsx')) resultFileName += '.xlsx';
+
+          } catch (err: any) {
+            console.error('Advanced PDF to Excel error:', err);
+            const text = await extractText(firstFileBytes);
+            const rows = text.split('\n').map(line => [line]);
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            resultBlob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            resultFileName = `fallback_${firstFile.name.replace(/\.pdf$/i, '.xlsx')}`;
+          }
           break;
         }
 
@@ -1092,11 +1382,11 @@ export default function App() {
           overlay.innerHTML = `
             <div style="background: white; padding: 40px 60px; text-align: center; border-radius: 24px; box-shadow: 0 30px 70px rgba(0,0,0,0.25); border: 1px solid #e2e8f0; max-width: 550px;">
               <div style="width: 56px; height: 56px; border: 6px solid #f1f5f9; border-top: 6px solid #ef4444; border-radius: 50%; animation: spin 0.8s cubic-bezier(0.5, 0, 0.5, 1) infinite; margin: 0 auto 24px;"></div>
-              <h2 style="font-family: sans-serif; color: #1e293b; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.03em;">Local Fidelity Engine</h2>
-              <p id="conversion-status" style="font-family: sans-serif; color: #64748b; font-size: 16px; margin-top: 12px; line-height: 1.6;">Rendering document locally for maximum privacy...</p>
+              <h2 style="font-family: sans-serif; color: #1e293b; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.03em;">${t('conversion_pro_engine')}</h2>
+              <p id="conversion-status" style="font-family: sans-serif; color: #64748b; font-size: 16px; margin-top: 12px; line-height: 1.6;">${t('rendering_pixel_perfect')}</p>
               <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
             </div>
-            <div id="render-target" style="width: 816px; background: white; position: absolute; left: -9999px; top: 0;"></div>
+            <div id="render-target" style="width: 1200px; background: white; position: absolute; left: -9999px; top: 0;"></div>
           `;
           document.body.appendChild(overlay);
           const renderTarget = overlay.querySelector('#render-target') as HTMLElement;
@@ -1126,7 +1416,7 @@ export default function App() {
             const docxWrapper = renderTarget.querySelector('.docx-wrapper') as HTMLElement;
             if (!docxWrapper) throw new Error('Render failed');
 
-            statusText.innerText = "Optimizing layout and borders...";
+            statusText.innerText = t('optimizing_layout');
             
             const style = document.createElement('style');
             style.innerHTML = `
@@ -1137,9 +1427,6 @@ export default function App() {
                 margin: 0 !important; 
                 border: none !important;
                 position: relative !important;
-                padding: 20mm !important;
-                width: 210mm !important;
-                min-height: 297mm !important;
                 box-sizing: border-box !important;
               }
               .docx-wrapper span { border: none !important; background: transparent !important; }
@@ -1150,26 +1437,39 @@ export default function App() {
             docxWrapper.appendChild(style);
 
             const sections = docxWrapper.querySelectorAll('section');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            
             const processTarget = sections.length > 0 ? Array.from(sections) : [docxWrapper];
             
+            // Determine initial orientation from the first page
+            const firstPage = processTarget[0] as HTMLElement;
+            const isFirstLandscape = firstPage.offsetWidth > firstPage.offsetHeight;
+            const pdf = new jsPDF(isFirstLandscape ? 'l' : 'p', 'mm', 'a4');
+            
             for (let i = 0; i < processTarget.length; i++) {
-              statusText.innerText = `Finalizing Page ${i + 1} of ${processTarget.length}...`;
+              statusText.innerText = t('finalizing_page', { current: i + 1, total: processTarget.length });
               const target = processTarget[i] as HTMLElement;
               
+              // Detect orientation for this specific page
+              const isLandscape = target.offsetWidth > target.offsetHeight;
+              const pageWidth = isLandscape ? 297 : 210;
+              const pageHeight = isLandscape ? 210 : 297;
+
+              if (i > 0) {
+                pdf.addPage('a4', isLandscape ? 'l' : 'p');
+              }
+              
               const canvas = await html2canvas(target, {
-                scale: 3,
+                scale: 4, // High scale for sharp text
                 useCORS: true,
                 backgroundColor: '#ffffff',
                 logging: false,
                 width: target.offsetWidth,
-                height: target.offsetHeight
+                height: target.offsetHeight,
+                windowWidth: target.offsetWidth,
+                windowHeight: target.offsetHeight
               });
               
               const imgData = canvas.toDataURL('image/jpeg', 1.0);
-              if (i > 0) pdf.addPage();
-              pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+              pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
             }
 
             resultBlob = pdf.output('blob');
