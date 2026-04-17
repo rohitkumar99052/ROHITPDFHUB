@@ -635,6 +635,7 @@ export default function App() {
   const [selectedTool, setSelectedTool] = useState<PDFTool | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -782,6 +783,13 @@ export default function App() {
       'edit_pdf_instruction': 'Click anywhere on the PDF pages to add text. Double-click to edit or drag to reposition.',
       'tool_remove-bg_title': 'Remove Background',
       'tool_remove-bg_desc': 'Instantly remove image backgrounds with AI precision. Perfect for profile photos and product images.',
+      'remove_bg_note': 'Note: The first use might take a moment to load the AI model for high precision.',
+      'no_background': 'No Background',
+      'bg_editor': 'Background Editor',
+      'bg_color': 'Background Color',
+      'bg_image': 'Background Image',
+      'download_final': 'Download HD Image',
+      'choose_image': 'Choose Image',
     },
     'Hindi': {
       'home': 'होम',
@@ -890,6 +898,13 @@ export default function App() {
       'finalizing_page': 'पेज {current} / {total} को अंतिम रूप दिया जा रहा है...',
       'tool_remove-bg_title': 'रिमूव बैकग्राउंड (AI)',
       'tool_remove-bg_desc': 'AI की मदद से इमेज का बैकग्राउंड तुरंत हटाएं। प्रोफाइल फोटो और प्रोडक्ट इमेज के लिए बेहतरीन।',
+      'remove_bg_note': 'नोट: पहली बार इस्तेमाल करने पर AI मॉडल लोड होने में थोड़ा समय लग सकता है।',
+      'no_background': 'कोई बैकग्राउंड नहीं',
+      'bg_editor': 'बैकग्राउंड एडिटर',
+      'bg_color': 'बैकग्राउंड का रंग',
+      'bg_image': 'बैकग्राउंड इमेज',
+      'download_final': 'HD इमेज डाउनलोड करें',
+      'choose_image': 'इमेज चुनें',
     },
     'Spanish': {
       'home': 'Inicio',
@@ -1300,6 +1315,7 @@ export default function App() {
   const processPDF = async () => {
     if (files.length === 0 || !selectedTool) return;
     setIsProcessing(true);
+    setProcessingProgress(0);
 
     try {
       console.log('Starting processPDF for tool:', selectedTool.id);
@@ -1355,15 +1371,19 @@ export default function App() {
       switch (selectedTool.id) {
         case 'merge': {
           const mergedPdf = await PDFDocument.create();
-          for (const file of files) {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            setProcessingProgress(Math.round((i / files.length) * 100));
             const bytes = await file.arrayBuffer();
             const pdf = await PDFDocument.load(bytes);
             const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
             copiedPages.forEach((page) => mergedPdf.addPage(page));
           }
+          setProcessingProgress(95);
           const bytes = await mergedPdf.save();
           resultBlob = new Blob([bytes], { type: 'application/pdf' });
           resultFileName = 'merged_smartpdf.pdf';
+          setProcessingProgress(100);
           break;
         }
 
@@ -1411,12 +1431,15 @@ export default function App() {
               }
 
               console.log(`Extracting ${uniquePages.length} pages:`, uniquePages);
+              setProcessingProgress(30);
               const copiedPages = await splitPdf.copyPages(pdf, uniquePages);
+              setProcessingProgress(60);
               copiedPages.forEach(p => splitPdf.addPage(p));
-              
+              setProcessingProgress(90);
               const bytes = await splitPdf.save();
               resultBlob = new Blob([bytes], { type: 'application/pdf' });
               resultFileName = `extracted_${firstFile.name}`;
+              setProcessingProgress(100);
             } else {
               console.log('No range specified. Splitting all pages into a ZIP file...');
               // Split every page into its own PDF and bundle in ZIP
@@ -1424,6 +1447,7 @@ export default function App() {
               const folderName = firstFile.name.replace('.pdf', '_split');
               
               for (let i = 0; i < numPages; i++) {
+                setProcessingProgress(Math.round((i / numPages) * 100));
                 const singlePdf = await PDFDocument.create();
                 const [page] = await singlePdf.copyPages(pdf, [i]);
                 singlePdf.addPage(page);
@@ -1431,8 +1455,10 @@ export default function App() {
                 zip.file(`page_${i + 1}.pdf`, bytes);
               }
               
+              setProcessingProgress(95);
               resultBlob = await zip.generateAsync({ type: 'blob' });
               resultFileName = `${folderName}.zip`;
+              setProcessingProgress(100);
             }
           } catch (err: any) {
             console.error('Split PDF error:', err);
@@ -1443,19 +1469,25 @@ export default function App() {
         }
 
         case 'rotate-pdf': {
+          setProcessingProgress(10);
           const pdf = await PDFDocument.load(firstFileBytes);
+          setProcessingProgress(50);
           pdf.getPages().forEach(page => page.setRotation(degrees(90)));
+          setProcessingProgress(80);
           const bytes = await pdf.save();
           resultBlob = new Blob([bytes], { type: 'application/pdf' });
           resultFileName = `rotated_${firstFile.name}`;
+          setProcessingProgress(100);
           break;
         }
 
         case 'compress': {
+          setProcessingProgress(20);
           // For PDF compression, we'll handle it in the global target size logic 
           // to avoid double processing and ensure the target size is respected.
           resultBlob = new Blob([firstFileBytes], { type: 'application/pdf' });
           resultFileName = `compressed_${firstFile.name}`;
+          setProcessingProgress(40);
           break;
         }
 
@@ -1465,10 +1497,11 @@ export default function App() {
             const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(firstFileBytes) });
             const pdf = await loadingTask.promise;
             const numPages = pdf.numPages;
-            
+            setProcessingProgress(5);
             const sections: any[] = [];
 
             for (let i = 1; i <= numPages; i++) {
+              setProcessingProgress(Math.round((i / numPages) * 100));
               const page = await pdf.getPage(i);
               const textContent = await page.getTextContent();
               const viewport = page.getViewport({ scale: 1.0 });
@@ -2073,36 +2106,47 @@ export default function App() {
         }
 
         case 'repair-pdf': {
+          setProcessingProgress(10);
           // Repairing involves re-saving the PDF structure
           const pdf = await PDFDocument.load(firstFileBytes, { ignoreEncryption: true });
+          setProcessingProgress(60);
           const bytes = await pdf.save();
           resultBlob = new Blob([bytes], { type: 'application/pdf' });
           resultFileName = `repaired_${firstFile.name}`;
+          setProcessingProgress(100);
           break;
         }
 
         case 'scan-to-pdf': {
+          setProcessingProgress(10);
           const pdf = await PDFDocument.create();
           const imgBytes = await firstFile.arrayBuffer();
+          setProcessingProgress(40);
           const img = await pdf.embedJpg(imgBytes);
+          setProcessingProgress(70);
           const page = pdf.addPage([img.width, img.height]);
           page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
           const bytes = await pdf.save();
           resultBlob = new Blob([bytes], { type: 'application/pdf' });
           resultFileName = `scanned_${Date.now()}.pdf`;
+          setProcessingProgress(100);
           break;
         }
 
         case 'ocr-pdf': {
+          setProcessingProgress(10);
           // OCR is simulated client-side, but we can extract and re-layer text
           const text = await extractText(firstFileBytes);
+          setProcessingProgress(60);
           const pdf = await PDFDocument.create();
           const page = pdf.addPage();
           page.drawText('OCR Searchable Layer Added:', { x: 50, y: 800, size: 14 });
           page.drawText(text.substring(0, 500), { x: 50, y: 750, size: 10 });
+          setProcessingProgress(90);
           const bytes = await pdf.save();
           resultBlob = new Blob([bytes], { type: 'application/pdf' });
           resultFileName = `ocr_${firstFile.name}`;
+          setProcessingProgress(100);
           break;
         }
 
@@ -2131,10 +2175,13 @@ export default function App() {
         }
 
         case 'watermark': {
+          setProcessingProgress(10);
           const pdf = await PDFDocument.load(firstFileBytes);
+          setProcessingProgress(30);
           const text = toolOptions.watermark || 'SmartPdf';
           const pages = pdf.getPages();
-          pages.forEach(page => {
+          pages.forEach((page, i) => {
+            setProcessingProgress(Math.round(30 + (i / pages.length) * 50));
             page.drawText(text, {
               x: page.getWidth() / 2 - 50,
               y: page.getHeight() / 2,
@@ -2143,9 +2190,11 @@ export default function App() {
               rotate: degrees(45)
             });
           });
+          setProcessingProgress(90);
           const bytes = await pdf.save();
           resultBlob = new Blob([bytes], { type: 'application/pdf' });
           resultFileName = `watermarked_${firstFile.name}`;
+          setProcessingProgress(100);
           break;
         }
 
@@ -2168,7 +2217,9 @@ export default function App() {
 
         case 'jpg-to-pdf': {
           const pdf = await PDFDocument.create();
-          for (const file of files) {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            setProcessingProgress(Math.round((i / files.length) * 100));
             const imgBytes = await file.arrayBuffer();
             let img;
             if (file.type === 'image/png') {
@@ -2179,9 +2230,11 @@ export default function App() {
             const page = pdf.addPage([img.width, img.height]);
             page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
           }
+          setProcessingProgress(95);
           const bytes = await pdf.save();
           resultBlob = new Blob([bytes], { type: 'application/pdf' });
           resultFileName = 'images_to_pdf.pdf';
+          setProcessingProgress(100);
           break;
         }
 
@@ -2266,6 +2319,7 @@ export default function App() {
             const pdf = new jsPDF(isFirstLandscape ? 'l' : 'p', 'mm', 'a4');
             
             for (let i = 0; i < processTarget.length; i++) {
+              setProcessingProgress(Math.round((i / processTarget.length) * 100));
               statusText.innerText = t('finalizing_page', { current: i + 1, total: processTarget.length });
               const target = processTarget[i] as HTMLElement;
               
@@ -2412,14 +2466,46 @@ export default function App() {
 
         case 'remove-bg': {
           console.log('Starting AI Background Removal...');
+          setProcessingProgress(1); 
+          let currentVisualProgress = 1;
+          
+          // Smoother progress counting logic
+          const progressInterval = setInterval(() => {
+            setProcessingProgress(prev => {
+              if (prev < 99) {
+                // If the real progress is higher than visual, catch up faster
+                // Otherwise move slowly
+                return prev + 1;
+              }
+              return prev;
+            });
+          }, 40); // Fast counting effect
+
           try {
-            // Processing logic using @imgly/background-removal
             const blob = await removeBackground(firstFile, {
               progress: (key, current, total) => {
-                const percent = Math.round((current / total) * 100);
-                console.log(`Processing ${key}: ${percent}%`);
-              }
+                const phasePercent = total > 0 ? (current / total) * 100 : 0;
+                let targetPercent = 0;
+                
+                if (key === 'fetch') {
+                  targetPercent = Math.round(phasePercent * 0.4);
+                } else if (key === 'compute') {
+                  targetPercent = Math.round(40 + phasePercent * 0.55);
+                } else {
+                  targetPercent = 98;
+                }
+                
+                // Allow the counting interval to reach this target
+                // We don't setProcessingProgress directly to avoid jumps
+                // But we can "bump" it if it's lagging way behind
+                setProcessingProgress(prev => Math.max(prev, targetPercent));
+                console.log(`AI Step ${key}: ${targetPercent}%`);
+              },
+              model: 'medium',
             });
+            
+            clearInterval(progressInterval);
+            setProcessingProgress(100);
             
             const reader = new FileReader();
             const dataUrl = await new Promise<string>((resolve) => {
@@ -2429,18 +2515,18 @@ export default function App() {
 
             setBgEditorImage(dataUrl);
             setBgOriginalName(firstFile.name.split('.')[0]);
+            setBgEditorColor('transparent');
+            setBgEditorCustomImage(null);
             setBgEditorOpen(true);
             setIsProcessing(false);
-            return; // Don't proceed to auto-download
+            return; 
           } catch (error) {
+            clearInterval(progressInterval);
             console.error('Background removal failed:', error);
-            // Fallback simulation if model fails to load or other errors
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            resultBlob = firstFile;
-            resultFileName = `processed_${firstFile.name}`;
-            alert('Background removal processing encountered an error, falling back to original.');
+            setIsProcessing(false);
+            alert('Background removal processing encountered an error. Please try again or use a smaller image.');
+            return;
           }
-          break;
         }
 
         default: {
@@ -2571,6 +2657,9 @@ export default function App() {
                   for (const config of rasterConfigs) {
                     if (foundAggressive) break;
                     
+                    const rasterIdx = rasterConfigs.indexOf(config);
+                    setProcessingProgress(Math.round(40 + (rasterIdx / rasterConfigs.length) * 50));
+                    
                     console.log(`Trying rasterization with scale ${config.scale} and quality ${config.quality}...`);
                     const tempPdf = await PDFDocument.create();
                     
@@ -2656,6 +2745,8 @@ export default function App() {
           console.error('Failed to log history:', historyError);
         }
       }
+      setProcessingProgress(100);
+      await new Promise(resolve => setTimeout(resolve, 600));
     } catch (error: any) {
       console.error('Error processing PDF:', error);
       let errorMessage = 'An error occurred while processing the PDF. Please make sure the file is not corrupted or password protected.';
@@ -2708,7 +2799,7 @@ export default function App() {
         const x = (canvas.width - bgImg.width * scale) / 2;
         const y = (canvas.height - bgImg.height * scale) / 2;
         ctx.drawImage(bgImg, x, y, bgImg.width * scale, bgImg.height * scale);
-      } else {
+      } else if (bgEditorColor !== 'transparent') {
         ctx.fillStyle = bgEditorColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
@@ -3587,10 +3678,27 @@ export default function App() {
                             )}
                           >
                             {isProcessing ? (
-                              <>
-                                <Loader2 className="w-6 h-6 animate-spin" />
-                                Processing...
-                              </>
+                              <div className="flex flex-col items-center gap-3">
+                                <div className="flex items-center gap-4">
+                                  <div className="relative w-8 h-8">
+                                    <div className="absolute inset-0 border-4 border-white/20 rounded-full"></div>
+                                    <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  </div>
+                                  <span className="text-xl font-bold tracking-tight">
+                                    {t('processing')} {processingProgress > 0 ? `(${processingProgress}%)` : ''}
+                                  </span>
+                                </div>
+                                {processingProgress > 0 && (
+                                  <div className="w-64 h-2.5 bg-white/20 rounded-full overflow-hidden border border-white/10 backdrop-blur-sm">
+                                    <motion.div 
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${processingProgress}%` }}
+                                      transition={{ type: "spring", stiffness: 50, damping: 15 }}
+                                      className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                                    />
+                                  </div>
+                                )}
+                              </div>
                             ) : (
                               <>
                                 {selectedTool.id === 'merge' ? 'Merge PDF' : 
@@ -3603,6 +3711,12 @@ export default function App() {
                             )}
                           </button>
                         </div>
+                        {selectedTool.id === 'remove-bg' && !isProcessing && (
+                          <p className="mt-4 text-center text-xs text-slate-400 max-w-md mx-auto">
+                            <Info className="w-3 h-3 inline mr-1" />
+                            {t('remove_bg_note')}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -4471,14 +4585,22 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-5xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-auto max-h-[90vh]"
+              className="relative w-fit max-w-[95vw] bg-white rounded-[24px] shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]"
             >
               {/* Preview Area */}
-              <div className="flex-1 bg-slate-100 p-8 flex items-center justify-center relative overflow-hidden min-h-[300px]">
+              <div className="bg-white flex items-center justify-center relative overflow-hidden max-h-[60vh] md:max-h-none h-fit w-fit">
+                {/* Transparency Checkerboard */}
+                {bgEditorColor === 'transparent' && !bgEditorCustomImage && (
+                  <div className="absolute inset-0 z-0" style={{ 
+                    backgroundImage: 'radial-gradient(#cbd5e1 0.5px, transparent 0)',
+                    backgroundSize: '15px 15px',
+                    backgroundColor: '#ffffff'
+                  }} />
+                )}
                 <div 
-                  className="absolute inset-0 transition-all duration-300"
+                  className="absolute inset-0 transition-all duration-300 z-1"
                   style={{ 
-                    backgroundColor: bgEditorCustomImage ? 'transparent' : bgEditorColor,
+                    backgroundColor: bgEditorCustomImage || bgEditorColor === 'transparent' ? 'transparent' : bgEditorColor,
                     backgroundImage: bgEditorCustomImage ? `url(${bgEditorCustomImage})` : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center'
@@ -4487,25 +4609,43 @@ export default function App() {
                 <img 
                   src={bgEditorImage} 
                   alt="Processed" 
-                  className="relative z-10 max-w-full max-h-full object-contain shadow-2xl"
+                  className="relative z-10 max-w-full max-h-[60vh] md:max-h-[85vh] object-contain block"
                   referrerPolicy="no-referrer"
                 />
               </div>
 
               {/* Controls Area */}
-              <div className="w-full md:w-80 bg-white p-8 flex flex-col gap-8 border-l border-slate-100">
+              <div className="w-full md:w-72 bg-white p-6 flex flex-col gap-6 border-l border-slate-100">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-bold text-slate-800">Background Editor</h3>
-                  <button onClick={() => setBgEditorOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                    <X className="w-5 h-5 text-slate-400" />
+                  <h3 className="text-lg font-bold text-slate-800">{t('bg_editor')}</h3>
+                  <button onClick={() => setBgEditorOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors">
+                    <X className="w-4 h-4 text-slate-400" />
                   </button>
                 </div>
 
                 <div className="space-y-6">
                   <div>
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Background Color</label>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">{t('bg_color')}</label>
                     <div className="grid grid-cols-5 gap-2">
-                      {['#ffffff', '#f8fafc', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#000000', '#6366f1', '#ec4899'].map(color => (
+                      <button
+                        onClick={() => {
+                          setBgEditorColor('transparent');
+                          setBgEditorCustomImage(null);
+                        }}
+                        className={cn(
+                          "w-full aspect-square rounded-lg border-2 transition-all flex items-center justify-center overflow-hidden bg-slate-50",
+                          bgEditorColor === 'transparent' && !bgEditorCustomImage ? "border-red-500 scale-110 shadow-lg" : "border-slate-200"
+                        )}
+                        title={t('no_background')}
+                      >
+                        <div className="w-full h-full" style={{ 
+                          backgroundImage: 'linear-gradient(45deg, #ddd 25%, transparent 25%), linear-gradient(-45deg, #ddd 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ddd 75%), linear-gradient(-45deg, transparent 75%, #ddd 75%)',
+                          backgroundSize: '8px 8px',
+                          backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px'
+                        }} />
+                      </button>
+
+                      {['#ffffff', '#000000', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#6366f1', '#ec4899'].map(color => (
                         <button
                           key={color}
                           onClick={() => {
@@ -4514,7 +4654,7 @@ export default function App() {
                           }}
                           className={cn(
                             "w-full aspect-square rounded-lg border-2 transition-all",
-                            bgEditorColor === color && !bgEditorCustomImage ? "border-red-500 scale-110 shadow-lg" : "border-transparent"
+                            bgEditorColor === color && !bgEditorCustomImage ? "border-red-500 scale-110 shadow-lg" : "border-slate-200"
                           )}
                           style={{ backgroundColor: color }}
                         />
@@ -4537,7 +4677,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Background Image</label>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">{t('bg_image')}</label>
                     <button
                       onClick={() => {
                         const input = document.createElement('input');
@@ -4560,7 +4700,7 @@ export default function App() {
                       <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-red-100 transition-colors">
                         <Plus className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
                       </div>
-                      <span className="text-sm font-bold text-slate-500 group-hover:text-red-600">Choose Image</span>
+                      <span className="text-sm font-bold text-slate-500 group-hover:text-red-600">{t('choose_image')}</span>
                     </button>
                     {bgEditorCustomImage && (
                       <div className="mt-3 flex items-center justify-between p-2 bg-slate-50 rounded-xl">
@@ -4571,16 +4711,21 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="mt-auto pt-8 border-t border-slate-100 flex flex-col gap-3">
+                <div className="mt-auto pt-6 border-t border-slate-100 flex flex-col gap-3">
                   <button
                     onClick={downloadCustomBg}
                     disabled={isProcessing}
                     className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-100 flex items-center justify-center gap-3 active:scale-95 disabled:bg-slate-300 disabled:shadow-none"
                   >
                     {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                    Download Final
+                    {t('download_final')}
                   </button>
-                  <p className="text-[10px] text-center text-slate-400 font-medium uppercase tracking-wider">High Fidelity Output (PNG)</p>
+                  <button 
+                    onClick={() => setBgEditorOpen(false)}
+                    className="w-full text-slate-400 font-bold text-sm hover:text-slate-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             </motion.div>
