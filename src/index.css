@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  @keyframes blink-fade {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  --animate-blink: blink-fade 2s ease-in-out infinite;
+}
+
 @layer base {
   * {
     box-sizing: border-box;

@@ -8,6 +8,7 @@ import {
   X, 
   Upload, 
   File, 
+  FileStack,
   Download, 
   Loader2,
   ArrowLeft,
@@ -2636,12 +2637,15 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F3F0F7] font-sans text-slate-900">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm">
+      <nav className="sticky top-0 z-50 bg-white border-b border-solid border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-8">
           <div 
-            className="flex items-center gap-2 cursor-pointer" 
+            className="flex items-center gap-2 cursor-pointer group" 
             onClick={() => { setSelectedTool(null); setFiles([]); }}
           >
+            <div className="bg-red-600 p-1.5 rounded-lg group-hover:bg-red-700 transition-colors shadow-sm">
+              <FileStack className="w-6 h-6 text-white" />
+            </div>
             <span className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-500 tracking-tighter">
               SmartPdf
             </span>
@@ -2966,7 +2970,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto px-4 py-12">
+      <main className="max-w-7xl mx-auto px-4 pt-4 pb-12">
         <AnimatePresence mode="wait">
           {showAdminDashboard ? (
             <motion.div
@@ -3173,10 +3177,20 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12"
+              className="space-y-8"
             >
               {/* Hero */}
               <div className="text-center space-y-4 max-w-4xl mx-auto">
+                <div className="flex justify-center">
+                  <a 
+                    href="https://smartpdf.co.in" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs md:text-sm font-bold tracking-widest text-red-600 animate-blink hover:text-red-800 transition-colors uppercase"
+                  >
+                    smartpdf.co.in
+                  </a>
+                </div>
                 <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.1]">
                   {t('hero_title')}
                 </h1>
@@ -4347,10 +4361,13 @@ export default function App() {
       <footer className="bg-slate-900 text-slate-400 py-16 mt-20">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-5 gap-12">
           <div className="col-span-2 md:col-span-1 space-y-4">
-            <div className="flex items-center gap-2 text-white">
-            <span className="text-xl font-black text-white tracking-tighter">
-              SmartPdf
-            </span>
+            <div className="flex items-center gap-2 text-white group cursor-pointer" onClick={() => { setSelectedTool(null); setFiles([]); }}>
+              <div className="bg-red-600 p-1 rounded-md">
+                <FileStack className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-black text-white tracking-tighter">
+                SmartPdf
+              </span>
             </div>
             <p className="text-sm leading-relaxed">
               {t('footer_text')}
