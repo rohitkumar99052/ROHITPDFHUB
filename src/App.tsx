@@ -63,6 +63,7 @@ import mammoth from "mammoth";
 import html2pdf from 'html2pdf.js';
 import { renderAsync } from 'docx-preview';
 import JSZip from 'jszip';
+import { removeBackground } from '@imgly/background-removal';
 
 // Use Vite's native worker loading for pdfjs-dist
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -674,6 +675,11 @@ export default function App() {
   const [history, setHistory] = useState<any[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
+  const [bgEditorOpen, setBgEditorOpen] = useState(false);
+  const [bgEditorImage, setBgEditorImage] = useState<string | null>(null);
+  const [bgEditorColor, setBgEditorColor] = useState('#ffffff');
+  const [bgEditorCustomImage, setBgEditorCustomImage] = useState<string | null>(null);
+  const [bgOriginalName, setBgOriginalName] = useState('');
 
   const getUserEmoji = (seed: string) => {
     const emojis = ['😊', '😎', '🐱', '🐶', '🦊', '🦁', '🐼', '🐨', '🐯', '🐸', '🦄', '🐲', '🚀', '⭐', '🌈', '🎨'];
@@ -774,6 +780,8 @@ export default function App() {
       'email_updated': 'Email updated successfully!',
       'password_updated': 'Password updated successfully!',
       'edit_pdf_instruction': 'Click anywhere on the PDF pages to add text. Double-click to edit or drag to reposition.',
+      'tool_remove-bg_title': 'Remove Background',
+      'tool_remove-bg_desc': 'Instantly remove image backgrounds with AI precision. Perfect for profile photos and product images.',
     },
     'Hindi': {
       'home': 'होम',
@@ -880,6 +888,8 @@ export default function App() {
       'rendering_pixel_perfect': 'पिक्सेल-परफेक्ट एक्यूरेसी के साथ रेंडर हो रहा है...',
       'optimizing_layout': 'लेआउट और बॉर्डर्स को ऑप्टिमाइज़ किया जा रहा है...',
       'finalizing_page': 'पेज {current} / {total} को अंतिम रूप दिया जा रहा है...',
+      'tool_remove-bg_title': 'रिमूव बैकग्राउंड (AI)',
+      'tool_remove-bg_desc': 'AI की मदद से इमेज का बैकग्राउंड तुरंत हटाएं। प्रोफाइल फोटो और प्रोडक्ट इमेज के लिए बेहतरीन।',
     },
     'Spanish': {
       'home': 'Inicio',
@@ -1274,7 +1284,7 @@ export default function App() {
 
   const getAcceptType = () => {
     if (!selectedTool) return ".pdf";
-    if (selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg') return "image/jpeg,image/png";
+    if (selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' || selectedTool.id === 'pdf-to-jpg' || selectedTool.id === 'remove-bg') return "image/jpeg,image/png";
     if (selectedTool.id === 'word-to-pdf') return ".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     if (selectedTool.id === 'excel-to-pdf') return ".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     if (selectedTool.id === 'powerpoint-to-pdf') return ".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -2400,6 +2410,39 @@ export default function App() {
           break;
         }
 
+        case 'remove-bg': {
+          console.log('Starting AI Background Removal...');
+          try {
+            // Processing logic using @imgly/background-removal
+            const blob = await removeBackground(firstFile, {
+              progress: (key, current, total) => {
+                const percent = Math.round((current / total) * 100);
+                console.log(`Processing ${key}: ${percent}%`);
+              }
+            });
+            
+            const reader = new FileReader();
+            const dataUrl = await new Promise<string>((resolve) => {
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.readAsDataURL(blob);
+            });
+
+            setBgEditorImage(dataUrl);
+            setBgOriginalName(firstFile.name.split('.')[0]);
+            setBgEditorOpen(true);
+            setIsProcessing(false);
+            return; // Don't proceed to auto-download
+          } catch (error) {
+            console.error('Background removal failed:', error);
+            // Fallback simulation if model fails to load or other errors
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            resultBlob = firstFile;
+            resultFileName = `processed_${firstFile.name}`;
+            alert('Background removal processing encountered an error, falling back to original.');
+          }
+          break;
+        }
+
         default: {
           // Smart Simulation for all other tools
           await new Promise(resolve => setTimeout(resolve, 3000));
@@ -2629,6 +2672,61 @@ export default function App() {
         message: errorMessage,
         type: 'error'
       });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const downloadCustomBg = async () => {
+    if (!bgEditorImage) return;
+
+    setIsProcessing(true);
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const mainImg = new Image();
+      await new Promise((resolve) => {
+        mainImg.onload = resolve;
+        mainImg.src = bgEditorImage;
+      });
+
+      canvas.width = mainImg.width;
+      canvas.height = mainImg.height;
+
+      // 1. Draw Background
+      if (bgEditorCustomImage) {
+        const bgImg = new Image();
+        await new Promise((resolve) => {
+          bgImg.onload = resolve;
+          bgImg.src = bgEditorCustomImage;
+        });
+
+        // Cover fill algorithm
+        const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
+        const x = (canvas.width - bgImg.width * scale) / 2;
+        const y = (canvas.height - bgImg.height * scale) / 2;
+        ctx.drawImage(bgImg, x, y, bgImg.width * scale, bgImg.height * scale);
+      } else {
+        ctx.fillStyle = bgEditorColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // 2. Draw Transparent Subject
+      ctx.drawImage(mainImg, 0, 0);
+
+      // 3. Download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          saveAs(blob, `${bgOriginalName}_edited.png`);
+          setBgEditorOpen(false);
+          setNotification({ message: 'Saved successfully!', type: 'success' });
+        }
+      }, 'image/png', 1.0); // High quality PNG
+    } catch (err) {
+      console.error('Failed to save background:', err);
+      setNotification({ message: 'Failed to save image', type: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -3312,14 +3410,14 @@ export default function App() {
                         </div>
                         <div className="text-center">
                           <p className="text-xl font-bold text-slate-800">
-                            {selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' ? 'Select Images' : 
+                            {selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' || selectedTool.id === 'remove-bg' ? 'Select Images' : 
                              selectedTool.id === 'word-to-pdf' ? 'Select Word files' :
                              selectedTool.id === 'excel-to-pdf' ? 'Select Excel files' :
                              selectedTool.id === 'powerpoint-to-pdf' ? 'Select PowerPoint files' :
                              'Select PDF files'}
                           </p>
                           <p className="text-slate-500 mt-1">
-                            {selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' ? 'or drop images here' : 
+                            {selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' || selectedTool.id === 'remove-bg' ? 'or drop images here' : 
                              selectedTool.id === 'word-to-pdf' ? 'or drop Word documents here' :
                              selectedTool.id === 'excel-to-pdf' ? 'or drop Excel sheets here' :
                              selectedTool.id === 'powerpoint-to-pdf' ? 'or drop PowerPoint slides here' :
@@ -3498,6 +3596,7 @@ export default function App() {
                                 {selectedTool.id === 'merge' ? 'Merge PDF' : 
                                  selectedTool.id === 'rotate-pdf' ? 'Rotate PDF' : 
                                  selectedTool.id === 'compress-jpg' ? 'Compress JPG' : 
+                                 selectedTool.id === 'remove-bg' ? 'Remove Background' : 
                                  'Process PDF'}
                                 <Download className="w-6 h-6" />
                               </>
@@ -4350,6 +4449,138 @@ export default function App() {
                       <p className="text-sm text-slate-400">No activity found for this user.</p>
                     </div>
                   )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Background Removal Editor Modal */}
+      <AnimatePresence>
+        {bgEditorOpen && bgEditorImage && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 overflow-hidden">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setBgEditorOpen(false)}
+              className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-5xl bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-auto max-h-[90vh]"
+            >
+              {/* Preview Area */}
+              <div className="flex-1 bg-slate-100 p-8 flex items-center justify-center relative overflow-hidden min-h-[300px]">
+                <div 
+                  className="absolute inset-0 transition-all duration-300"
+                  style={{ 
+                    backgroundColor: bgEditorCustomImage ? 'transparent' : bgEditorColor,
+                    backgroundImage: bgEditorCustomImage ? `url(${bgEditorCustomImage})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                />
+                <img 
+                  src={bgEditorImage} 
+                  alt="Processed" 
+                  className="relative z-10 max-w-full max-h-full object-contain shadow-2xl"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              {/* Controls Area */}
+              <div className="w-full md:w-80 bg-white p-8 flex flex-col gap-8 border-l border-slate-100">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-slate-800">Background Editor</h3>
+                  <button onClick={() => setBgEditorOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Background Color</label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {['#ffffff', '#f8fafc', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#000000', '#6366f1', '#ec4899'].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            setBgEditorColor(color);
+                            setBgEditorCustomImage(null);
+                          }}
+                          className={cn(
+                            "w-full aspect-square rounded-lg border-2 transition-all",
+                            bgEditorColor === color && !bgEditorCustomImage ? "border-red-500 scale-110 shadow-lg" : "border-transparent"
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                      <div className="relative">
+                        <input 
+                          type="color" 
+                          value={bgEditorColor}
+                          onChange={(e) => {
+                            setBgEditorColor(e.target.value);
+                            setBgEditorCustomImage(null);
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                        <div className="w-full aspect-square rounded-lg bg-gradient-to-br from-red-500 via-green-500 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">
+                          Custom
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Background Image</label>
+                    <button
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = (e: any) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (re: any) => {
+                              setBgEditorCustomImage(re.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        };
+                        input.click();
+                      }}
+                      className="w-full p-4 rounded-2xl border-2 border-dashed border-slate-200 hover:border-red-400 hover:bg-red-50 transition-all flex flex-col items-center gap-2 group"
+                    >
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                        <Plus className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
+                      </div>
+                      <span className="text-sm font-bold text-slate-500 group-hover:text-red-600">Choose Image</span>
+                    </button>
+                    {bgEditorCustomImage && (
+                      <div className="mt-3 flex items-center justify-between p-2 bg-slate-50 rounded-xl">
+                        <span className="text-xs text-slate-500 font-medium">Custom background active</span>
+                        <button onClick={() => setBgEditorCustomImage(null)} className="text-[10px] font-bold text-red-500 hover:underline">Remove</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-auto pt-8 border-t border-slate-100 flex flex-col gap-3">
+                  <button
+                    onClick={downloadCustomBg}
+                    disabled={isProcessing}
+                    className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-100 flex items-center justify-center gap-3 active:scale-95 disabled:bg-slate-300 disabled:shadow-none"
+                  >
+                    {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                    Download Final
+                  </button>
+                  <p className="text-[10px] text-center text-slate-400 font-medium uppercase tracking-wider">High Fidelity Output (PNG)</p>
                 </div>
               </div>
             </motion.div>

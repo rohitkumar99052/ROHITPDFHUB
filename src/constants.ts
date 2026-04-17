@@ -28,6 +28,16 @@ import { PDFTool, ToolCategory } from './types';
 
 export const TOOLS: PDFTool[] = [
   {
+    id: 'remove-bg',
+    title: 'Remove Background',
+    description: 'Instantly remove image backgrounds with AI precision. Perfect for profile photos and product images.',
+    icon: Eraser,
+    category: ['All', 'Edit PDF'],
+    color: 'bg-indigo-600',
+    action: 'convert',
+    featured: true
+  },
+  {
     id: 'jpg-to-pdf',
     title: 'JPG to PDF',
     description: 'Convert JPG images to PDF in seconds. Easily adjust orientation and margins.',
