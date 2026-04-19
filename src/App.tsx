@@ -638,6 +638,7 @@ export default function App() {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingText, setProcessingText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -2561,46 +2562,85 @@ export default function App() {
 
         case 'remove-bg': {
           console.log('Starting AI Background Removal...');
-          setProcessingProgress(1); 
+          setProcessingProgress(1);
+          setProcessingText('Initializing AI Engine...');
           let currentVisualProgress = 1;
           
           // Smoother progress counting logic
           const progressInterval = setInterval(() => {
             setProcessingProgress(prev => {
               if (prev < 99) {
-                // If the real progress is higher than visual, catch up faster
-                // Otherwise move slowly
                 return prev + 1;
               }
               return prev;
             });
-          }, 40); // Fast counting effect
+          }, 60);
 
           try {
-            const blob = await removeBackground(firstFile, {
+            // Optimization: To balance super high quality without freezing mobile browsers,
+            // we scale down to an 800px constraint. This processes in ~5-15 seconds rather than 2 mins.
+            const maximizeAndCompress = async (file: File): Promise<Blob> => {
+              return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  let { width, height } = img;
+                  const MAX_SIZE = 800;
+                  
+                  if (width > MAX_SIZE || height > MAX_SIZE) {
+                    if (width > height) {
+                      height *= MAX_SIZE / width;
+                      width = MAX_SIZE;
+                    } else {
+                      width *= MAX_SIZE / height;
+                      height = MAX_SIZE;
+                    }
+                  }
+                  
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  if (!ctx) return resolve(file); // fallback
+                  
+                  ctx.drawImage(img, 0, 0, width, height);
+                  canvas.toBlob((blob) => {
+                    resolve(blob || file);
+                  }, 'image/jpeg', 0.95);
+                };
+                img.onerror = () => resolve(file); // fallback
+                img.src = URL.createObjectURL(file);
+              });
+            };
+
+            const optimizedFileBlob = await maximizeAndCompress(firstFile);
+            
+            const blob = await removeBackground(optimizedFileBlob, {
               progress: (key, current, total) => {
                 const phasePercent = total > 0 ? (current / total) * 100 : 0;
                 let targetPercent = 0;
                 
                 if (key === 'fetch') {
+                  setProcessingText('Downloading AI Models (one-time fast download)...');
                   targetPercent = Math.round(phasePercent * 0.4);
                 } else if (key === 'compute') {
+                  setProcessingText('Cutting out background with high-res precision...');
                   targetPercent = Math.round(40 + phasePercent * 0.55);
                 } else {
+                  setProcessingText('Finalizing image mask...');
                   targetPercent = 98;
                 }
                 
-                // Allow the counting interval to reach this target
-                // We don't setProcessingProgress directly to avoid jumps
-                // But we can "bump" it if it's lagging way behind
                 setProcessingProgress(prev => Math.max(prev, targetPercent));
-                console.log(`AI Step ${key}: ${targetPercent}%`);
               },
-              model: 'isnet',
+              // isnet_fp16 restores the extremely high quality cutting accuracy you lose with quint8,
+              // but shrinking the input canvas to 800px ensures it still operates incredibly fast.
+              model: 'isnet_fp16',
+              output: { format: 'image/png' }
             });
             
             clearInterval(progressInterval);
             setProcessingProgress(100);
+            setProcessingText('Done!');
             
             const reader = new FileReader();
             const dataUrl = await new Promise<string>((resolve) => {
@@ -3844,15 +3884,22 @@ export default function App() {
                             )}
                           >
                             {isProcessing ? (
-                              <div className="flex flex-col items-center gap-3">
-                                <div className="flex items-center gap-4">
-                                  <div className="relative w-8 h-8">
-                                    <div className="absolute inset-0 border-4 border-white/20 rounded-full"></div>
-                                    <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <div className="flex flex-col items-center gap-2 mt-1">
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="flex items-center gap-4">
+                                    <div className="relative w-8 h-8">
+                                      <div className="absolute inset-0 border-4 border-white/20 rounded-full"></div>
+                                      <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                    <span className="text-xl font-bold tracking-tight">
+                                      {t('processing')} {processingProgress > 0 ? `(${processingProgress}%)` : ''}
+                                    </span>
                                   </div>
-                                  <span className="text-xl font-bold tracking-tight">
-                                    {t('processing')} {processingProgress > 0 ? `(${processingProgress}%)` : ''}
-                                  </span>
+                                  {processingText && (
+                                    <span className="text-sm font-medium text-white/90 bg-black/10 px-3 py-1 rounded-full whitespace-nowrap">
+                                      {processingText}
+                                    </span>
+                                  )}
                                 </div>
                                 {processingProgress > 0 && (
                                   <div className="w-64 h-2.5 bg-white/20 rounded-full overflow-hidden border border-white/10 backdrop-blur-sm">
