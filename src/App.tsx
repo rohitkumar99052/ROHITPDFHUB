@@ -28,6 +28,7 @@ import {
   CheckCircle,
   Mail,
   Lock,
+  Phone,
   Type,
   Eraser,
   Link as LinkIcon,
@@ -89,6 +90,8 @@ import {
   updateEmail,
   updatePassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
+  signOut,
   doc, 
   setDoc, 
   getDoc,
@@ -1040,6 +1043,7 @@ export default function App() {
     email: '',
     password: '',
     fullName: '',
+    phone: '',
   });
 
   const [loginData, setLoginData] = useState({
@@ -1047,9 +1051,11 @@ export default function App() {
     password: '',
   });
 
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+
   const handleAuthError = (error: any) => {
     console.error('Auth error:', error);
-    let message = error.message;
+    let message = 'An error occurred during authentication.';
     
     if (error.code === 'auth/popup-closed-by-user') {
       message = 'Login cancelled. Please try again.';
@@ -1059,6 +1065,10 @@ export default function App() {
       message = 'This email is already registered. Please login instead.';
     } else if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
       message = 'Invalid email or password.';
+    } else if (error.code === 'auth/too-many-requests') {
+      message = 'Too many attempts. We have already sent verification emails to this address. Please check your inbox / spam folder or try again in a few minutes.';
+    } else {
+       message = error.message;
     }
     
     setNotification({ message, type: 'error' });
@@ -1074,19 +1084,41 @@ export default function App() {
       const userCredential = await createUserWithEmailAndPassword(auth, signUpData.email, signUpData.password);
       await updateProfile(userCredential.user, { displayName: signUpData.fullName });
       
-      // Create user document
+      // Create user document inside DB with optional phone
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: signUpData.fullName,
+        phone: signUpData.phone || null,
         role: 'user',
         createdAt: serverTimestamp()
       });
 
-      setNotification({ message: 'Account created successfully!', type: 'success' });
-      setShowSignUpModal(false);
+      // Send Verification Email
+      try {
+        await sendEmailVerification(userCredential.user);
+      } catch (err: any) {
+        console.warn("Could not send verification email immediately:", err);
+      }
+
+      setVerificationEmailSent(true);
+      
     } catch (error: any) {
       handleAuthError(error);
+    }
+  };
+
+  const checkVerificationStatus = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        setNotification({ message: 'Email verified! Welcome to the app.', type: 'success' });
+        setVerificationEmailSent(false);
+        setShowSignUpModal(false);
+        setUser(auth.currentUser);
+      } else {
+        alert('Your email is not verified yet. Please check your inbox and click the verification link.');
+      }
     }
   };
 
@@ -1097,6 +1129,8 @@ export default function App() {
       return;
     }
     try {
+      // The user requested NO email verification block during login ("login me nahi"). 
+      // If they signed up previously or somehow reached here, just let them login.
       await signInWithEmailAndPassword(auth, loginData.email, loginData.password);
       setNotification({ message: 'Logged in successfully!', type: 'success' });
       setShowLoginModal(false);
@@ -1164,6 +1198,7 @@ export default function App() {
     testConnection();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Allow users through. The verification UI was requested to just be a step on signup.
       setUser(currentUser);
       setIsAuthLoading(false);
       
@@ -2566,26 +2601,26 @@ export default function App() {
           setProcessingText('Initializing AI Engine...');
           let currentVisualProgress = 1;
           
-          // Smoother progress counting logic
+          // Smoother progress counting logic (slower so it doesn't freeze at 99%)
           const progressInterval = setInterval(() => {
             setProcessingProgress(prev => {
-              if (prev < 99) {
-                return prev + 1;
+              if (prev < 90) {
+                return prev + 1; // It will slowly creep to 90% over ~20 seconds
               }
               return prev;
             });
-          }, 60);
+          }, 200);
 
           try {
             // Optimization: To balance super high quality without freezing mobile browsers,
-            // we scale down to an 800px constraint. This processes in ~5-15 seconds rather than 2 mins.
+            // we scale down to a 1024px constraint.
             const maximizeAndCompress = async (file: File): Promise<Blob> => {
               return new Promise((resolve, reject) => {
                 const img = new Image();
                 img.onload = () => {
                   const canvas = document.createElement('canvas');
                   let { width, height } = img;
-                  const MAX_SIZE = 800;
+                  const MAX_SIZE = 1024; // 1024px for great quality
                   
                   if (width > MAX_SIZE || height > MAX_SIZE) {
                     if (width > height) {
@@ -2605,7 +2640,7 @@ export default function App() {
                   ctx.drawImage(img, 0, 0, width, height);
                   canvas.toBlob((blob) => {
                     resolve(blob || file);
-                  }, 'image/jpeg', 0.95);
+                  }, 'image/jpeg', 0.95); // High quality
                 };
                 img.onerror = () => resolve(file); // fallback
                 img.src = URL.createObjectURL(file);
@@ -2620,22 +2655,20 @@ export default function App() {
                 let targetPercent = 0;
                 
                 if (key === 'fetch') {
-                  setProcessingText('Downloading AI Models (one-time fast download)...');
+                  setProcessingText(`Downloading AI Engine (one-time)...`);
                   targetPercent = Math.round(phasePercent * 0.4);
                 } else if (key === 'compute') {
-                  setProcessingText('Cutting out background with high-res precision...');
+                  setProcessingText('Cutting background using smart AI...');
                   targetPercent = Math.round(40 + phasePercent * 0.55);
                 } else {
-                  setProcessingText('Finalizing image mask...');
+                  setProcessingText('Finalizing...');
                   targetPercent = 98;
                 }
                 
                 setProcessingProgress(prev => Math.max(prev, targetPercent));
               },
-              // isnet_fp16 restores the extremely high quality cutting accuracy you lose with quint8,
-              // but shrinking the input canvas to 800px ensures it still operates incredibly fast.
-              model: 'isnet_fp16',
-              output: { format: 'image/png' }
+              model: 'medium', // 'medium' provides much better quality than 'small' but avoids freezing
+              output: { format: 'image/png' } // PNG to retain perfect transparency
             });
             
             clearInterval(progressInterval);
@@ -3105,13 +3138,19 @@ export default function App() {
                   )}
                 </button>
                 
+                {showUserMenu && (
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowUserMenu(false)}
+                  />
+                )}
                 <AnimatePresence>
                   {showUserMenu && (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 space-y-4"
+                      className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 space-y-4 z-50"
                     >
                       <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
                         {user.photoURL ? (
@@ -3218,7 +3257,7 @@ export default function App() {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="hidden lg:flex items-center gap-2">
                 <button 
                   onClick={() => setShowLoginModal(true)}
                   className="bg-red-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-red-700 transition-all shadow-md active:scale-95"
@@ -3243,19 +3282,20 @@ export default function App() {
               <Menu className="w-6 h-6 text-slate-600" />
             </button>
 
+            {showMobileMenu && (
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowMobileMenu(false)}
+              />
+            )}
             <AnimatePresence>
               {showMobileMenu && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setShowMobileMenu(false)}
-                  />
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95, y: -20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                    className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-50 space-y-2"
-                  >
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                  className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-50 space-y-2"
+                >
                     <button 
                       onClick={() => { setShowAboutModal(true); setShowMobileMenu(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-700 font-bold transition-colors"
@@ -3305,8 +3345,24 @@ export default function App() {
                         )}
                       </AnimatePresence>
                     </div>
+
+                    {!user && (
+                      <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                        <button 
+                          onClick={() => { setShowLoginModal(true); setShowMobileMenu(false); }}
+                          className="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                        >
+                          {t('login')}
+                        </button>
+                        <button 
+                          onClick={() => { setShowSignUpModal(true); setShowMobileMenu(false); }}
+                          className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition-colors shadow-md"
+                        >
+                          {t('signup')}
+                        </button>
+                      </div>
+                    )}
                   </motion.div>
-                </>
               )}
             </AnimatePresence>
           </div>
@@ -3892,16 +3948,21 @@ export default function App() {
                                       <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                                     </div>
                                     <span className="text-xl font-bold tracking-tight">
-                                      {t('processing')} {processingProgress > 0 ? `(${processingProgress}%)` : ''}
+                                      {t('processing')} {selectedTool.id !== 'remove-bg' && processingProgress > 0 ? `(${processingProgress}%)` : ''}
                                     </span>
                                   </div>
                                   {processingText && (
-                                    <span className="text-sm font-medium text-white/90 bg-black/10 px-3 py-1 rounded-full whitespace-nowrap">
+                                    <span className={cn(
+                                      "text-sm font-medium px-4 py-1.5 rounded-full whitespace-nowrap shadow-md",
+                                      selectedTool.id === 'remove-bg' 
+                                        ? "bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 text-white animate-pulse"
+                                        : "text-white/90 bg-black/10"
+                                    )}>
                                       {processingText}
                                     </span>
                                   )}
                                 </div>
-                                {processingProgress > 0 && (
+                                {selectedTool.id !== 'remove-bg' && processingProgress > 0 && (
                                   <div className="w-64 h-2.5 bg-white/20 rounded-full overflow-hidden border border-white/10 backdrop-blur-sm">
                                     <motion.div 
                                       initial={{ width: 0 }}
@@ -4462,7 +4523,10 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowSignUpModal(false)}
+              onClick={() => {
+                setShowSignUpModal(false);
+                setVerificationEmailSent(false); // Reset state so next time it opens cleanly
+              }}
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div 
@@ -4477,90 +4541,145 @@ export default function App() {
                     <UserIcon className="w-8 h-8" />
                     <h2 className="text-3xl font-bold">{t('signup')}</h2>
                   </div>
-                  <button onClick={() => setShowSignUpModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                  <button onClick={() => {
+                    setShowSignUpModal(false);
+                    setVerificationEmailSent(false);
+                  }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                     <X className="w-6 h-6" />
                   </button>
                 </div>
-                <p className="text-red-100 mt-2 text-sm">{t('signup_subtitle')}</p>
+                <p className="text-red-100 mt-2 text-sm">{verificationEmailSent ? 'Verification Required' : t('signup_subtitle')}</p>
               </div>
 
-              <div className="p-8 space-y-6">
-                <form onSubmit={handleEmailSignUp} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('full_name')}</label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="text" 
-                        placeholder="John Doe"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
-                        value={signUpData.fullName}
-                        onChange={(e) => setSignUpData(prev => ({ ...prev, fullName: e.target.value }))}
-                      />
+              <div className="p-8">
+                {verificationEmailSent ? (
+                  <div className="text-center space-y-6">
+                    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+                      <Mail className="w-10 h-10 text-red-500" />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('email_label')}</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="email" 
-                        placeholder="john@example.com"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
-                        value={signUpData.email}
-                        onChange={(e) => setSignUpData(prev => ({ ...prev, email: e.target.value }))}
-                      />
+                    <div>
+                      <h3 className="text-2xl font-bold text-slate-800">Verify Your Email</h3>
+                      <p className="mt-3 text-slate-500 leading-relaxed">
+                        We've sent a verification link to <strong className="text-slate-800">{signUpData.email}</strong>. 
+                        Please click the link in your email to complete your signup process.
+                      </p>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('password')}</label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input 
-                        type="password" 
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
-                        value={signUpData.password}
-                        onChange={(e) => setSignUpData(prev => ({ ...prev, password: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95 mt-4"
-                  >
-                    {t('signup')}
-                  </button>
-                </form>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-100"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-slate-400">Or continue with</span>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={handleGoogleLogin}
-                  className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95"
-                >
-                  <Globe className="w-5 h-5 text-blue-500" />
-                  {t('google_auth')}
-                </button>
-
-                <div className="pt-6 border-t border-slate-100 text-center">
-                  <p className="text-sm text-slate-500">
-                    {t('already_have_account')}{' '}
                     <button 
-                      onClick={() => { setShowSignUpModal(false); setShowLoginModal(true); }}
-                      className="text-red-600 font-bold hover:underline"
+                      onClick={checkVerificationStatus}
+                      className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95"
                     >
-                      {t('login')}
+                      I've verified my email
                     </button>
-                  </p>
-                </div>
+                    <p className="text-xs text-slate-400">Did not receive it? Check your spam folder.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <form onSubmit={handleEmailSignUp} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          FULL NAME <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="text" 
+                            placeholder="John Doe"
+                            required
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                            value={signUpData.fullName}
+                            onChange={(e) => setSignUpData(prev => ({ ...prev, fullName: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          {t('email_label')} <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="email" 
+                            required
+                            placeholder="john@example.com"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                            value={signUpData.email}
+                            onChange={(e) => setSignUpData(prev => ({ ...prev, email: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          MOBILE NUMBER (OPTIONAL)
+                        </label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="tel" 
+                            placeholder="+1 234 567 8900"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                            value={signUpData.phone}
+                            onChange={(e) => setSignUpData(prev => ({ ...prev, phone: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          {t('password')} <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="password" 
+                            required
+                            placeholder="••••••••"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                            value={signUpData.password}
+                            onChange={(e) => setSignUpData(prev => ({ ...prev, password: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <button 
+                        type="submit"
+                        className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg active:scale-95 mt-4"
+                      >
+                        {t('signup')}
+                      </button>
+                    </form>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-100"></div>
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white px-2 text-slate-400">Or continue with</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={handleGoogleLogin}
+                      className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95"
+                    >
+                      <Globe className="w-5 h-5 text-blue-500" />
+                      {t('google_auth')}
+                    </button>
+
+                    <div className="pt-6 border-t border-slate-100 text-center">
+                      <p className="text-sm text-slate-500">
+                        {t('already_have_account')}{' '}
+                        <button 
+                          onClick={() => { 
+                            setShowSignUpModal(false); 
+                            setVerificationEmailSent(false); // Make sure this is cleared
+                            setShowLoginModal(true); 
+                          }}
+                          className="text-red-600 font-bold hover:underline"
+                        >
+                          {t('login')}
+                        </button>
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

@@ -11,7 +11,8 @@ import {
   updateProfile,
   updateEmail,
   updatePassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendEmailVerification
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -31,6 +32,7 @@ export {
   updateEmail,
   updatePassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   doc, 
   setDoc, 
   getDoc, 
