@@ -68,6 +68,7 @@ import { removeBackground } from '@imgly/background-removal';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import FlappyBird from './components/FlappyBird';
+import NptelMcq from './components/NptelMcq';
 
 // Use Vite's native worker loading for pdfjs-dist
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -1338,7 +1339,7 @@ export default function App() {
 
   const getAcceptType = () => {
     if (!selectedTool) return ".pdf";
-    if (selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' || selectedTool.id === 'pdf-to-jpg' || selectedTool.id === 'remove-bg') return "image/jpeg,image/png";
+    if (selectedTool.id === 'jpg-to-pdf' || selectedTool.id === 'compress-jpg' || selectedTool.id === 'remove-bg') return "image/jpeg,image/png";
     if (selectedTool.id === 'word-to-pdf') return ".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     if (selectedTool.id === 'excel-to-pdf') return ".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     if (selectedTool.id === 'powerpoint-to-pdf') return ".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -3726,6 +3727,8 @@ export default function App() {
 
                   {selectedTool.id === 'flappy-bird' ? (
                     <FlappyBird />
+                  ) : selectedTool.id === 'nptel-mcq' ? (
+                    <NptelMcq />
                   ) : (
                     /* Upload Area */
                     <div 
