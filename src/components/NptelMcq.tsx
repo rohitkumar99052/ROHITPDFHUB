@@ -33,6 +33,7 @@ export default function NptelMcq() {
     questions: Question[];
     answers: Record<string, string>; // questionId -> selectedOptionOriginalId
     isSubmitted: boolean;
+    title: string;
   } | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState(0);
@@ -89,9 +90,12 @@ export default function NptelMcq() {
     return newArr;
   };
 
-  const startQuiz = () => {
-    // Randomize questions
-    let shuffledQuestions = shuffleArray(questions);
+  const startQuiz = (totalQs: number, startIndex: number = 0, title: string = "FULL MOCK TEST") => {
+    // Take the slice before randomizing the slice
+    let slice = questions.slice(startIndex, startIndex + totalQs);
+    
+    // Randomize questions within the chunk
+    let shuffledQuestions = shuffleArray(slice);
     
     // Randomize options for each question
     shuffledQuestions = shuffledQuestions.map(q => ({
@@ -102,7 +106,8 @@ export default function NptelMcq() {
     setCurrentQuiz({
       questions: shuffledQuestions,
       answers: {},
-      isSubmitted: false
+      isSubmitted: false,
+      title: title
     });
   };
 
@@ -146,7 +151,7 @@ export default function NptelMcq() {
       <div className="w-full max-w-4xl mx-auto py-4 md:py-8 relative">
         <div className="flex flex-col md:flex-row md:items-center justify-between items-start md:items-end mb-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 gap-4">
           <div>
-            <h2 className="text-2xl font-black text-slate-800 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">NPTEL IOT MOCK TEST</h2>
+            <h2 className="text-2xl font-black text-slate-800 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">{currentQuiz.title}</h2>
             <p className="text-slate-500 font-medium">Attempting {currentQuiz.questions.length} Questions</p>
           </div>
           {currentQuiz.isSubmitted && (
@@ -293,16 +298,35 @@ export default function NptelMcq() {
 
       {questions.length > 0 ? (
         <div className="space-y-6">
-          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 inline-block w-full max-w-md">
-            <h3 className="text-6xl font-black text-slate-800 mb-2">{questions.length}</h3>
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm mb-8">Questions Loaded from System</p>
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 w-full max-w-4xl mx-auto">
+            <h3 className="text-4xl font-black text-slate-800 mb-2">{questions.length} Questions Loaded</h3>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm mb-8">Select Exam Section</p>
             
-            <button 
-              onClick={startQuiz}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-4 rounded-2xl font-black text-xl hover:shadow-xl hover:shadow-pink-200 active:scale-95 transition-all"
-            >
-              START MOCK EXAM
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+              {Array.from({ length: Math.ceil(questions.length / 30) }).map((_, i) => {
+                const start = i * 30;
+                const setSize = Math.min(30, questions.length - start);
+                return (
+                  <button 
+                    key={i}
+                    onClick={() => startQuiz(setSize, start, `NPTEL Mock Test: Part ${i + 1}`)}
+                    className="flex flex-col items-center justify-center bg-slate-50 hover:bg-purple-50 border-2 border-slate-100 hover:border-purple-200 p-6 rounded-2xl transition-all hover:scale-[1.02] active:scale-95 group"
+                  >
+                    <span className="text-xl font-bold text-slate-700 group-hover:text-purple-700 transition-colors">Part {i + 1}</span>
+                    <span className="text-sm font-medium text-slate-500 mt-2">{setSize} Questions</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="pt-8 border-t border-slate-100">
+              <button 
+                onClick={() => startQuiz(questions.length, 0, "FULL COMPREHENSIVE TEST")}
+                className="w-full max-w-md mx-auto bg-gradient-to-r from-purple-600 to-pink-500 text-white py-4 rounded-2xl font-black text-xl hover:shadow-xl hover:shadow-pink-200 active:scale-95 transition-all"
+              >
+                ATTEMPT ALL {questions.length} QUESTIONS
+              </button>
+            </div>
           </div>
         </div>
       ) : (
