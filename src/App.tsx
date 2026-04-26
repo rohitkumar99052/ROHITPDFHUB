@@ -662,6 +662,7 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [showInstallGuideModal, setShowInstallGuideModal] = useState(false);
+  const [showApkModal, setShowApkModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedUserHistory, setSelectedUserHistory] = useState<any[]>([]);
   const [userData, setUserData] = useState<any>(null);
@@ -3280,13 +3281,12 @@ export default function App() {
           </div>
           
           <div className="hidden sm:block mr-2">
-            <a 
-              href="/SmartPdf.apk" 
-              download="SmartPdf.apk"
+            <button 
+              onClick={() => setShowApkModal(true)}
               className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:shadow-lg hover:from-green-600 hover:to-emerald-700 active:scale-95 transition-all animate-pulse-slow"
             >
               <Download className="w-4 h-4" /> Android APK
-            </a>
+            </button>
           </div>
 
           <div className="relative">
@@ -3463,14 +3463,12 @@ export default function App() {
                   exit={{ opacity: 0, scale: 0.95, y: -20 }}
                   className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-50 space-y-2"
                 >
-                    <a 
-                      href="/SmartPdf.apk" 
-                      download="SmartPdf.apk"
-                      onClick={() => setShowMobileMenu(false)}
+                    <button 
+                      onClick={() => { setShowApkModal(true); setShowMobileMenu(false); }}
                       className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:shadow-lg transition-all mb-2 animate-pulse-slow"
                     >
                       <Download className="w-5 h-5" /> Download Android APK
-                    </a>
+                    </button>
                     <button 
                       onClick={() => { setShowAboutModal(true); setShowMobileMenu(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-700 font-bold transition-colors"
@@ -4338,6 +4336,64 @@ export default function App() {
                   >
                     {t('got_it')}
                   </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showApkModal && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-black text-slate-800">Download Android App</h3>
+                  <button onClick={() => setShowApkModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
+                    <strong>Note:</strong> We cannot provide a direct <code>.apk</code> download here because you are viewing this app in a preview environment.
+                  </div>
+
+                  <p className="text-slate-600 text-sm">
+                    However, you can get a <strong>100% native app experience</strong> and add this to your home screen right now using your browser's install feature.
+                  </p>
+
+                  <button 
+                    onClick={() => {
+                      setShowApkModal(false);
+                      handleInstallClick();
+                      if (!isInstallable && !deferredPrompt) {
+                        setShowInstallGuideModal(true);
+                      }
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow transition-colors flex justify-center items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" /> Install via Browser
+                  </button>
+                  
+                  <div className="border-t border-slate-200 my-2" />
+                  
+                  <p className="text-xs text-slate-500 font-bold uppercase">Need a real .apk file?</p>
+                  <p className="text-xs text-slate-600">
+                    If you must have an actual <code>.apk</code> file for distribution, simply copy this website's URL and use a free PWA-to-APK converter:
+                  </p>
+                  
+                  <a 
+                    href="https://www.webintoapp.com/" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="flex justify-center items-center gap-2 w-full border-2 border-slate-200 text-slate-600 font-bold py-2 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+                  >
+                    Go to WebIntoApp.com
+                  </a>
                 </div>
               </div>
             </motion.div>
