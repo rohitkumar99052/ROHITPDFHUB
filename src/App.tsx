@@ -3811,40 +3811,43 @@ export default function App() {
 
               {/* Categories */}
               
-              {/* MOBILE HERO SUBTITLE */}
-              <div className="md:hidden bg-red-600 px-4 pb-1.5 text-white/90 text-xs tracking-wide -mx-4 -mt-4 pt-4">
-                <p className="mb-2">everything you need to manage your documents</p>
-                <div className="flex items-center bg-white rounded-full px-3 py-1.5 shadow-sm">
-                  <Search className="w-4 h-4 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="Search tools..." 
-                    className="bg-transparent border-none outline-none focus:ring-0 text-sm ml-2 w-full text-slate-800 placeholder-slate-400"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+              {/* MOBILE HEADER (Subtitle & Tabs) */}
+              <div className="md:hidden bg-red-600 -mx-4 -mt-4 pt-2 flex flex-col rounded-b-xl shadow-sm z-10 relative">
+                {/* SUBTITLE & SEARCH */}
+                <div className="px-4 pb-0 text-white/90 text-xs tracking-wide">
+                  <p className="mb-2 uppercase font-bold tracking-widest text-[10px]">Everything you need to manage your documents</p>
+                  <div className="flex items-center bg-white rounded-full px-3 py-1.5 shadow-sm">
+                    <Search className="w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Search tools..." 
+                      className="bg-transparent border-none outline-none focus:ring-0 text-sm ml-2 w-full text-slate-800 placeholder-slate-400"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* MOBILE CATEGORIES (WhatsApp Tabs) */}
-              <div className="md:hidden bg-red-600 flex overflow-x-auto gap-4 px-4 pt-2 font-bold text-sm border-b border-red-600 shadow-sm relative no-scrollbar -mx-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                <style>{`
-                  .no-scrollbar::-webkit-scrollbar {
-                    display: none;
-                  }
-                `}</style>
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={cn(
-                      "pb-3 whitespace-nowrap border-b-[3px] transition-colors",
-                      activeCategory === cat ? "border-white text-white font-bold" : "border-transparent text-white/60 font-medium"
-                    )}
-                  >
-                    {translateCategory(cat)}
-                  </button>
-                ))}
+                {/* TABS */}
+                <div className="flex overflow-x-auto gap-4 px-4 pt-2 font-bold text-sm shadow-sm relative no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  <style>{`
+                    .no-scrollbar::-webkit-scrollbar {
+                      display: none;
+                    }
+                  `}</style>
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={cn(
+                        "pb-3 whitespace-nowrap border-b-[3px] transition-colors",
+                        activeCategory === cat ? "border-white text-white font-bold" : "border-transparent text-white/60 font-medium"
+                      )}
+                    >
+                      {translateCategory(cat)}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Desktop Categories */}
@@ -3918,7 +3921,7 @@ export default function App() {
               </div>
 
               {/* WhatsApp Chat List (Mobile) */}
-              <div className="md:hidden flex flex-col bg-white min-h-[calc(100vh-140px)] -mx-4 pb-20">
+              <div className="md:hidden flex flex-col bg-white min-h-[calc(100vh-140px)] -mx-4 pb-20 -mt-6">
                 {filteredTools.map((tool) => {
                   const tTool = translateTool(tool);
                   return (
