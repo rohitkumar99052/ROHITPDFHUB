@@ -3456,7 +3456,7 @@ export default function App() {
             <div className="bg-white/20 p-2 rounded-full">
               <FileStack className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">SmallPDF</span>
+            <span className="text-xl font-bold tracking-tight text-white">SmartPdf</span>
           </div>
           
           <div className="flex items-center gap-5">
@@ -3938,14 +3938,14 @@ export default function App() {
                       <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm", tool.color)}>
                         <tool.icon className="w-6 h-6" />
                       </div>
-                      <div className="flex-1 overflow-hidden border-b border-slate-100 pb-3 mt-3">
-                        <div className="flex justify-between items-baseline mb-0.5">
-                          <h3 className="font-semibold text-slate-900 text-base">{tTool.title}</h3>
+                      <div className="flex-1 overflow-hidden border-b border-slate-100 pb-3">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <h3 className="font-bold text-slate-900 text-sm leading-tight pr-2">{tTool.title}</h3>
                           {tool.featured && (
-                            <span className="text-[10px] text-red-600 font-bold">Featured</span>
+                            <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap shrink-0">Featured</span>
                           )}
                         </div>
-                        <p className="text-slate-500 text-sm truncate">{tTool.description}</p>
+                        <p className="text-slate-500 text-xs line-clamp-1">{tTool.description}</p>
                       </div>
                     </div>
                   );
