@@ -48,7 +48,8 @@ import {
   Palette,
   Move,
   Copy,
-  ChevronUp
+  ChevronUp,
+  MoreVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PDFDocument, degrees, rgb, PDFName } from 'pdf-lib';
@@ -3151,8 +3152,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F3F0F7] font-sans text-slate-900">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-solid border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-8">
+      <nav className="hidden md:flex sticky top-0 z-50 bg-white border-b border-solid border-slate-200 px-4 py-2 items-center justify-between shadow-sm">        <div className="flex items-center gap-8">
           <div 
             className="flex items-center gap-2 cursor-pointer group" 
             onClick={() => { setSelectedTool(null); setFiles([]); }}
@@ -3279,17 +3279,6 @@ export default function App() {
             </div>
           </div>
           
-          <div className="hidden sm:block mr-2">
-            <a 
-              href="https://drive.google.com/uc?export=download&id=17pVQZTXqU--vFysxa9Ww9Ztw7_zR_GEl"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:shadow-lg hover:from-red-600 hover:to-red-700 active:scale-95 transition-all animate-pulse-slow"
-            >
-              <Download className="w-4 h-4" /> Android APK
-            </a>
-          </div>
-
           <div className="relative">
             {isAuthLoading ? (
               <div className="w-10 h-10 rounded-full bg-slate-100 animate-pulse" />
@@ -3449,30 +3438,49 @@ export default function App() {
             >
               <Menu className="w-6 h-6 text-slate-600" />
             </button>
+          </div>
+        </div>
+      </nav>
+      {/* Mobile Navbar (WhatsApp Style) */}
+      <div className="md:hidden sticky top-0 z-50 bg-red-600 text-white shadow-md">
+        <div className="px-4 py-3 flex justify-between items-center">
+          <div 
+            className="flex items-center gap-2 cursor-pointer" 
+            onClick={() => { setSelectedTool(null); setFiles([]); }}
+          >
+            <div className="bg-white/20 p-2 rounded-full">
+              <FileStack className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-white">SmallPDF</span>
+          </div>
+          
+          <div className="flex items-center gap-5">
+            <button onClick={() => setShowLanguageMenu(!showLanguageMenu)} className="relative">
+              <span className="font-bold text-sm uppercase tracking-widest">{currentLanguage.substring(0, 2)}</span>
+            </button>
+            <button onClick={() => setShowMobileMenu(!showMobileMenu)}>
+              <MoreVertical className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
 
-            {showMobileMenu && (
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setShowMobileMenu(false)}
-              />
-            )}
-            <AnimatePresence>
+          {/* Mobile Dropdown Fixed to Top Right */}
+          <div className="absolute right-4 top-14 z-[100] text-slate-900 pointer-events-none w-full">
+            <div className="relative w-full h-full pointer-events-auto">
               {showMobileMenu && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95, y: -20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                  className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-50 space-y-2"
-                >
-                    <a 
-                      href="https://drive.google.com/uc?export=download&id=17pVQZTXqU--vFysxa9Ww9Ztw7_zR_GEl"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setShowMobileMenu(false)}
-                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-3 rounded-xl font-bold hover:shadow-lg hover:from-red-600 hover:to-red-700 transition-all mb-2 animate-pulse-slow"
-                    >
-                      <Download className="w-5 h-5" /> Download Android APK
-                    </a>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowMobileMenu(false)}
+                />
+              )}
+              <AnimatePresence>
+                {showMobileMenu && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                    className="absolute right-0 top-12 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-50 space-y-2"
+                  >
                     <button 
                       onClick={() => { setShowAboutModal(true); setShowMobileMenu(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-700 font-bold transition-colors"
@@ -3540,11 +3548,11 @@ export default function App() {
                       </div>
                     )}
                   </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
-      </nav>
 
       <AnimatePresence>
         {notification && (
@@ -3782,7 +3790,7 @@ export default function App() {
               className="space-y-8"
             >
               {/* Hero */}
-              <div className="text-center space-y-4 max-w-4xl mx-auto">
+              <div className="hidden md:block text-center space-y-4 max-w-4xl mx-auto">
                 <div className="flex justify-center">
                   <a 
                     href="https://smartpdf.co.in" 
@@ -3802,8 +3810,45 @@ export default function App() {
               </div>
 
               {/* Categories */}
-              <div className="flex flex-wrap justify-center gap-2">
+              
+              {/* MOBILE HERO SUBTITLE */}
+              <div className="md:hidden bg-red-600 px-4 pb-1.5 text-white/90 text-xs tracking-wide -mx-4 -mt-4 pt-4">
+                <p className="mb-2">everything you need to manage your documents</p>
+                <div className="flex items-center bg-white rounded-full px-3 py-1.5 shadow-sm">
+                  <Search className="w-4 h-4 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search tools..." 
+                    className="bg-transparent border-none outline-none focus:ring-0 text-sm ml-2 w-full text-slate-800 placeholder-slate-400"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* MOBILE CATEGORIES (WhatsApp Tabs) */}
+              <div className="md:hidden bg-red-600 flex overflow-x-auto gap-4 px-4 pt-2 font-bold text-sm border-b border-red-600 shadow-sm relative no-scrollbar -mx-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <style>{`
+                  .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
                 {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={cn(
+                      "pb-3 whitespace-nowrap border-b-[3px] transition-colors",
+                      activeCategory === cat ? "border-white text-white font-bold" : "border-transparent text-white/60 font-medium"
+                    )}
+                  >
+                    {translateCategory(cat)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Desktop Categories */}
+<div className="hidden md:flex flex-wrap justify-center gap-2">               {CATEGORIES.map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
@@ -3820,7 +3865,7 @@ export default function App() {
               </div>
 
               {/* Tool Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {filteredTools.map((tool) => {
                   const tTool = translateTool(tool);
                   return (
@@ -3868,6 +3913,33 @@ export default function App() {
                         <Plus className="w-4 h-4 text-slate-300" />
                       </div>
                     </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* WhatsApp Chat List (Mobile) */}
+              <div className="md:hidden flex flex-col bg-white min-h-[calc(100vh-140px)] -mx-4 pb-20">
+                {filteredTools.map((tool) => {
+                  const tTool = translateTool(tool);
+                  return (
+                    <div
+                      key={tool.id}
+                      onClick={() => setSelectedTool(tool)}
+                      className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 cursor-pointer active:bg-slate-100 transition-colors"
+                    >
+                      <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm", tool.color)}>
+                        <tool.icon className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1 overflow-hidden border-b border-slate-100 pb-3 mt-3">
+                        <div className="flex justify-between items-baseline mb-0.5">
+                          <h3 className="font-semibold text-slate-900 text-base">{tTool.title}</h3>
+                          {tool.featured && (
+                            <span className="text-[10px] text-red-600 font-bold">Featured</span>
+                          )}
+                        </div>
+                        <p className="text-slate-500 text-sm truncate">{tTool.description}</p>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
